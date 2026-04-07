@@ -1,0 +1,17 @@
+{
+  "name": "node-react",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "generate-icons": "bun run build && node build/scripts/icons-set.js"
+  },
+  "devDependencies": {
+    "@shopify/react-native-skia": "v2.0.0-next.4",
+    "@types/node": "^22.5.4",
+    "@types/react": "^19.0.10",
+    "react": "^19.0.0",
+    "typescript": "^5.5.4"
+  }
+}

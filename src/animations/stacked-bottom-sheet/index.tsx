@@ -1,0 +1,23 @@
+import { StyleSheet } from 'react-native';
+
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { App } from './src';
+import { StackedSheetProvider } from './src/stacked-sheet-manager';
+
+export const StackedBottomSheet = () => {
+  return (
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={localStyles.fill}>
+        <StackedSheetProvider>
+          <App />
+        </StackedSheetProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
+  );
+};
+
+const localStyles = StyleSheet.create({
+  fill: { flex: 1 },
+});

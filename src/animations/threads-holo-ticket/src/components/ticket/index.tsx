@@ -1,0 +1,156 @@
+/**
+ * A flippable ticket component that supports pan and tap gestures for rotation.
+ * The ticket has two sides (front and back) and uses a holographic effect.
+ */
+
+import { StyleSheet } from 'react-native';
+
+import { type FC, memo, type ReactNode } from 'react';
+
+import * as Haptics from 'expo-haptics';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withDecay,
+  withSpring,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
+
+import { HolographicCard } from '../holographic-card';
+
+/**
+ * Props for the Ticket component
+ * @typedef {Object} TicketProps
+ * @property {number} width - The width of the ticket
+ * @property {number} height - The height of the ticket
+ * @property {ReactNode} [frontSide] - Content to display on the front of the ticket
+ * @property {ReactNode} [backSide] - Content to display on the back of the ticket
+ */
+type TicketProps = {
+  width: number;
+  height: number;
+  frontSide?: ReactNode;
+  backSide?: ReactNode;
+};
+
+export const Ticket: FC<TicketProps> = memo(
+  ({ width, height, frontSide, backSide }) => {
+    // Shared values for tracking horizontal translation and gesture context
+    const translateX = useSharedValue(0);
+    const contextX = useSharedValue(0);
+
+    // Pan gesture handler for continuous rotation
+    const panGesture = Gesture.Pan()
+      .minDistance(10)
+      .hitSlop({ top: 50, bottom: 50, left: 50, right: 50 })
+      .onStart(() => {
+        contextX.value = translateX.value;
+      })
+      .onUpdate(event => {
+        translateX.value = event.translationX + contextX.value;
+      })
+      .onEnd(event => {
+        // Apply decay animation with better deceleration
+        translateX.value = withDecay({
+          velocity: event.velocityX * 0.7,
+          deceleration: 0.998,
+          clamp: [translateX.value - 1080, translateX.value + 1080],
+        });
+      });
+
+    // Derived value for Y-axis rotation based on translation
+    const rotateY = useDerivedValue(() => {
+      return translateX.value % 360;
+    });
+
+    // Tap gesture handler for flipping the ticket
+    const tapGesture = Gesture.Tap()
+      .maxDistance(10)
+      .hitSlop({ top: 50, bottom: 50, left: 50, right: 50 })
+      .onStart(() => {
+        cancelAnimation(translateX);
+      })
+      .onEnd(() => {
+        cancelAnimation(translateX);
+        scheduleOnRN(Haptics.selectionAsync);
+        // Normalize to nearest 180-degree increment and flip to opposite side
+        const normalizedRotation = Math.round(translateX.value / 180) * 180;
+        const targetRotation = normalizedRotation + 180;
+        translateX.value = withSpring(targetRotation, {
+          dampingRatio: 1.5,
+          duration: 500,
+        });
+      });
+
+    // Combine gestures with Race - only one gesture can win
+    const gesture = Gesture.Race(tapGesture, panGesture);
+
+    const rTicketStyle = useAnimatedStyle(() => {
+      const rotateYValue = `${rotateY.value}deg`;
+
+      return {
+        transform: [{ perspective: 1000 }, { rotateY: rotateYValue }],
+      };
+    });
+
+    // Determine which side is currently visible
+    const isFront = useDerivedValue(() => {
+      const absRotate = Math.abs(rotateY.value);
+      return absRotate < 90 || absRotate > 270;
+    });
+
+    const rFrontStyle = useAnimatedStyle(() => {
+      return {
+        opacity: isFront.value ? 1 : 0,
+        zIndex: isFront.value ? 1 : 0,
+      };
+    });
+
+    const rBackStyle = useAnimatedStyle(() => {
+      return {
+        opacity: isFront.value ? 0 : 1,
+        zIndex: isFront.value ? 0 : 1,
+      };
+    });
+
+    return (
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          style={[
+            {
+              width,
+              height,
+              overflow: 'hidden',
+            },
+            rTicketStyle,
+          ]}>
+          {/* Holographic effect layer */}
+          <HolographicCard
+            width={width}
+            height={height}
+            rotateY={rotateY}
+            color="#FFF5EEFF"
+          />
+          {/* Front side content */}
+          <Animated.View style={[StyleSheet.absoluteFill, rFrontStyle]}>
+            {frontSide}
+          </Animated.View>
+          {/* Back side content (mirrored with scaleX: -1) */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                transform: [{ scaleX: -1 }],
+              },
+              rBackStyle,
+            ]}>
+            {backSide}
+          </Animated.View>
+        </Animated.View>
+      </GestureDetector>
+    );
+  },
+);

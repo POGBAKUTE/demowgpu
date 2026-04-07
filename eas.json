@@ -1,0 +1,54 @@
+{
+  "cli": {
+    "version": ">= 11.0.2",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "base": {
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0",
+        "cocoapods": "1.15.2",
+        "autoIncrement": "buildNumber"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": "versionCode"
+      },
+      "env": {
+        "EXPO_PUBLIC_LIQUID_GLASS_ENABLED": "true"
+      }
+    },
+    "development": {
+      "channel": "development",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_LIQUID_GLASS_ENABLED": "true",
+        "EXPO_PUBLIC_APP_VARIANT": "development"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_LIQUID_GLASS_ENABLED": "true",
+        "EXPO_PUBLIC_APP_VARIANT": "production"
+      }
+    }
+  },
+  "submit": {
+    "development": {
+      "ios": {
+        "appleTeamId": "W3N4N47454",
+        "ascAppId": "6754805604",
+        "bundleIdentifier": "com.reactiive.dev"
+      }
+    },
+    "production": {
+      "ios": {
+        "appleTeamId": "W3N4N47454",
+        "ascAppId": "6670311735",
+        "bundleIdentifier": "com.reactiive.app"
+      }
+    }
+  }
+}
