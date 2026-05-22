@@ -1,0 +1,167 @@
+{
+  "accessors": [
+    {
+      "name": "strip_grass_2_1_0_positions",
+      "componentType": 5126,
+      "count": 36,
+      "min": [
+        -12.5,
+        0,
+        -0.5
+      ],
+      "max": [
+        12.5,
+        0.375,
+        0.5
+      ],
+      "type": "VEC3",
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "name": "strip_grass_2_1_0_normals",
+      "componentType": 5126,
+      "count": 36,
+      "min": [
+        -1,
+        -1,
+        -1
+      ],
+      "max": [
+        1,
+        1,
+        1
+      ],
+      "type": "VEC3",
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "name": "strip_grass_2_1_0_texcoords",
+      "componentType": 5126,
+      "count": 36,
+      "min": [
+        0.0039059999398887157,
+        0.7734370231628418
+      ],
+      "max": [
+        0.8632810115814209,
+        0.9921870231628418
+      ],
+      "type": "VEC2",
+      "bufferView": 2,
+      "byteOffset": 0
+    },
+    {
+      "name": "strip_grass_2_1_0_indices",
+      "componentType": 5123,
+      "count": 36,
+      "min": [
+        0
+      ],
+      "max": [
+        35
+      ],
+      "type": "SCALAR",
+      "bufferView": 3,
+      "byteOffset": 0
+    }
+  ],
+  "asset": {
+    "generator": "obj2gltf",
+    "version": "2.0"
+  },
+  "buffers": [
+    {
+      "name": "model",
+      "byteLength": 1224,
+      "uri": "data:application/octet-stream;base64,AABIQQAAwD4AAAC/AABIwQAAwD4AAAC/AABIwQAAwD4AAAA/AABIQQAAwD4AAAC/AABIwQAAwD4AAAA/AABIQQAAwD4AAAA/AABIQQAAAAAAAAA/AABIwQAAAAAAAAA/AABIwQAAAAAAAAC/AABIQQAAAAAAAAA/AABIwQAAAAAAAAC/AABIQQAAAAAAAAC/AABIQQAAwD4AAAC/AABIQQAAwD4AAAA/AABIQQAAAAAAAAA/AABIQQAAwD4AAAC/AABIQQAAAAAAAAA/AABIQQAAAAAAAAC/AABIwQAAAAAAAAC/AABIwQAAAAAAAAA/AABIwQAAwD4AAAA/AABIwQAAAAAAAAC/AABIwQAAwD4AAAA/AABIwQAAwD4AAAC/AABIQQAAAAAAAAC/AABIwQAAAAAAAAC/AABIwQAAwD4AAAC/AABIQQAAAAAAAAC/AABIwQAAwD4AAAC/AABIQQAAwD4AAAC/AABIQQAAwD4AAAA/AABIwQAAwD4AAAA/AABIwQAAAAAAAAA/AABIQQAAwD4AAAA/AABIwQAAAAAAAAA/AABIQQAAAAAAAAA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/zvt/O/j/fT/8/0g/+P99P/z/SD/4/20/zvt/O/j/fT/8/0g/+P9tP877fzv4/20/zvt/O/j/aT/8/0g/+P9pP/z/SD/4/1k/zvt/O/j/aT/8/0g/+P9ZP877fzv4/1k//P9UP/j/fT/8/1w/+P99P/z/XD8AAHg//P9UP/j/fT/8/1w/AAB4P/z/VD8AAHg/BABLP/j/fT8EAFM/+P99PwQAUz8AAHg/BABLP/j/fT8EAFM/AAB4PwQASz8AAHg/zvt/OwAATD/8/0g/AABMP/z/SD/4/0U/zvt/OwAATD/8/0g/+P9FP877fzv4/0U/zvt/O/j/VT/8/0g/+P9VP/z/SD8AAFA/zvt/O/j/VT/8/0g/AABQP877fzsAAFA/AAABAAIAAwAEAAUABgAHAAgACQAKAAsADAANAA4ADwAQABEAEgATABQAFQAWABcAGAAZABoAGwAcAB0AHgAfACAAIQAiACMA"
+    }
+  ],
+  "bufferViews": [
+    {
+      "name": "bufferView_0",
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 0,
+      "byteStride": 12,
+      "target": 34962
+    },
+    {
+      "name": "bufferView_1",
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 432,
+      "byteStride": 12,
+      "target": 34962
+    },
+    {
+      "name": "bufferView_2",
+      "buffer": 0,
+      "byteLength": 288,
+      "byteOffset": 864,
+      "byteStride": 8,
+      "target": 34962
+    },
+    {
+      "name": "bufferView_3",
+      "buffer": 0,
+      "byteLength": 72,
+      "byteOffset": 1152,
+      "target": 34963
+    }
+  ],
+  "materials": [
+    {
+      "name": "strip_grass_2-tex.tex",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.5,
+          0.5,
+          0.5,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "alphaMode": "OPAQUE",
+      "doubleSided": false
+    }
+  ],
+  "meshes": [
+    {
+      "name": "strip_grass_2_1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "strip_grass_2",
+      "mesh": 0
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}

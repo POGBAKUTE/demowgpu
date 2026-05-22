@@ -1,0 +1,58 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+target 'demoWGPU2' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      # :ccache_enabled => true
+    )
+    # Honor RCT_METRO_PORT at build time so `react-native run-ios --port N`
+    # bakes the chosen port into the binary instead of defaulting to 8081.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS']
+        defs = ['$(inherited)'] if defs.nil?
+        defs = [defs] if defs.is_a?(String)
+        defs += ["RCT_METRO_PORT=#{ENV['RCT_METRO_PORT'] || 8081}"]
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+      end
+    end
+    # react-native-sound's podspec doesn't declare AVFoundation; link it on the main app.
+    installer.aggregate_targets.each do |agg|
+      agg.user_project.targets.each do |t|
+        next unless t.name == 'demoWGPU2'
+        t.build_configurations.each do |config|
+          ldflags = config.build_settings['OTHER_LDFLAGS'] || ['$(inherited)']
+          ldflags = [ldflags] if ldflags.is_a?(String)
+          ldflags += ['-framework', 'AVFoundation'] unless ldflags.include?('AVFoundation')
+          config.build_settings['OTHER_LDFLAGS'] = ldflags
+        end
+      end
+      agg.user_project.save
+    end
+  end
+end
