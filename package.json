@@ -46,6 +46,7 @@
     "@react-navigation/native-stack": "^7.10.1",
     "@shopify/react-native-skia": "^2.5.4",
     "burnt": "^0.13.0",
+    "cannon-es": "^0.20.0",
     "color": "^4.2.3",
     "date-fns": "^4.1.0",
     "expo": "~55.0.4",
