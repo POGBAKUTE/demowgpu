@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Image, PanResponder, StyleSheet, Text } from 'react-native';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { View, Image, PanResponder, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Canvas, type CanvasRef } from 'react-native-wgpu';
 import 'react-native-wgpu';
 import * as THREE from 'three';
@@ -44,6 +44,14 @@ const TEX_URIS: Record<string, any> = {
 export const PorscheViewer = () => {
   const ref = useRef<CanvasRef>(null);
   const [fps, setFps] = useState(0);
+  const [quality, setQuality] = useState<'high' | 'fast'>('high');
+  const lightsRef = useRef<{
+    ambient: THREE.AmbientLight;
+    hemi: THREE.HemisphereLight;
+    key: THREE.DirectionalLight;
+    fill: THREE.DirectionalLight;
+    rim: THREE.DirectionalLight;
+  } | null>(null);
 
   // Spherical orbit state
   const theta = useRef(0);      // horizontal angle
@@ -91,21 +99,17 @@ export const PorscheViewer = () => {
         (renderer as any).toneMapping = THREE.ACESFilmicToneMapping;
         (renderer as any).toneMappingExposure = 1.0;
 
-        // Showroom lighting: bright ambient + 3-point
-        scene.add(new THREE.AmbientLight(0xffffff, 2.0));
-        scene.add(new THREE.HemisphereLight(0xeef4ff, 0x445566, 2.0));
-
+        // Lighting (intensities toggled via quality button)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
+        const hemiLight = new THREE.HemisphereLight(0xeef4ff, 0x445566, 2.0);
         const keyLight = new THREE.DirectionalLight(0xfff8f0, 5.0);
         keyLight.position.set(3, 5, 6);
-        scene.add(keyLight);
-
         const fillLight = new THREE.DirectionalLight(0xbbddff, 2.5);
         fillLight.position.set(-5, 3, 4);
-        scene.add(fillLight);
-
         const rimLight = new THREE.DirectionalLight(0xffffff, 2.0);
         rimLight.position.set(0, 4, -5);
-        scene.add(rimLight);
+        scene.add(ambientLight, hemiLight, keyLight, fillLight, rimLight);
+        lightsRef.current = { ambient: ambientLight, hemi: hemiLight, key: keyLight, fill: fillLight, rim: rimLight };
 
         const ground = new THREE.Mesh(
           new THREE.PlaneGeometry(20, 20),
@@ -212,12 +216,39 @@ export const PorscheViewer = () => {
     return () => { stopped = true; };
   }, [ref]);
 
+  const toggleQuality = useCallback(() => {
+    const lights = lightsRef.current;
+    if (!lights) return;
+    setQuality(prev => {
+      const next = prev === 'high' ? 'fast' : 'high';
+      if (next === 'fast') {
+        // Fast: only ambient + key light
+        lights.ambient.intensity = 3.0;
+        lights.hemi.intensity = 0;
+        lights.key.intensity = 4.0;
+        lights.fill.intensity = 0;
+        lights.rim.intensity = 0;
+      } else {
+        // High: full showroom 3-point
+        lights.ambient.intensity = 2.0;
+        lights.hemi.intensity = 2.0;
+        lights.key.intensity = 5.0;
+        lights.fill.intensity = 2.5;
+        lights.rim.intensity = 2.0;
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <View style={s.root} {...panResponder.panHandlers}>
       <Canvas ref={ref} style={StyleSheet.absoluteFill} />
       <View style={s.fpsWrap} pointerEvents="none">
         <Text style={s.fpsText}>{fps} FPS</Text>
       </View>
+      <TouchableOpacity style={s.btn} onPress={toggleQuality}>
+        <Text style={s.btnText}>{quality === 'high' ? '✦ Quality' : '⚡ Fast'}</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -226,4 +257,6 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#111827' },
   fpsWrap: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   fpsText: { color: '#0f0', fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
+  btn: { position: 'absolute', bottom: 36, alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  btnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });
