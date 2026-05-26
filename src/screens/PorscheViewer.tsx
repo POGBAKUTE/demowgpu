@@ -91,13 +91,20 @@ export const PorscheViewer = () => {
         (renderer as any).toneMapping = THREE.ACESFilmicToneMapping;
         (renderer as any).toneMappingExposure = 1.0;
 
-        // Hemisphere (sky/ground) + key light — enough for good PBR look
-        scene.add(new THREE.HemisphereLight(0xddeeff, 0x222830, 1.5));
-        const keyLight = new THREE.DirectionalLight(0xfff4e0, 3.5);
-        keyLight.position.set(4, 8, 4);
+        // Showroom lighting: bright ambient + 3-point
+        scene.add(new THREE.AmbientLight(0xffffff, 2.0));
+        scene.add(new THREE.HemisphereLight(0xeef4ff, 0x445566, 2.0));
+
+        const keyLight = new THREE.DirectionalLight(0xfff8f0, 5.0);
+        keyLight.position.set(3, 5, 6);
         scene.add(keyLight);
-        const rimLight = new THREE.DirectionalLight(0x8899ff, 1.0);
-        rimLight.position.set(-4, 3, -4);
+
+        const fillLight = new THREE.DirectionalLight(0xbbddff, 2.5);
+        fillLight.position.set(-5, 3, 4);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        rimLight.position.set(0, 4, -5);
         scene.add(rimLight);
 
         const ground = new THREE.Mesh(
@@ -118,7 +125,7 @@ export const PorscheViewer = () => {
           const y = radius * Math.sin(phi.current) + 0.8;
           const z = radius * Math.cos(phi.current) * Math.cos(theta.current);
           camera.position.set(x, y, z);
-          camera.lookAt(0, 0.8, 0);
+          camera.lookAt(0, 0.6, 0);
           renderer.render(scene, camera);
           (context as any).present();
 
@@ -189,9 +196,12 @@ export const PorscheViewer = () => {
         box.getSize(size);
         const scale = 3 / Math.max(size.x, size.y, size.z);
         gltf.scene.scale.setScalar(scale);
-        const sc = center.multiplyScalar(scale);
-        gltf.scene.position.set(-sc.x, -sc.y, -sc.z);
-        gltf.scene.position.y = 0;
+        // Center X/Z, place bottom of car at y=0 (on ground)
+        gltf.scene.position.set(
+          -center.x * scale,
+          -box.min.y * scale,   // lift so bottom sits on y=0
+          -center.z * scale,
+        );
         scene.add(gltf.scene);
 
       } catch (e: any) {
