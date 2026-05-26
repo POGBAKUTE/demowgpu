@@ -120,12 +120,75 @@ async function loadModel(modelPath) {
 }
 ```
 
-### 4.3 Pattern load GLTF
+### 4.3 Pattern load GLTF (có textures riêng — đã verified với Porsche 911 GT3)
+
+**Root cause quan trọng:** Three.js WebGPU renderer dùng `ImageBitmapLoader` để load textures. `ImageBitmapLoader` gọi `fetch(url).then(r => r.blob()).then(blob => createImageBitmap(blob))` — nhưng `react-native-wgpu`'s `createImageBitmap` **chỉ nhận `ArrayBuffer`**, không nhận `Blob` → fail hoàn toàn.
+
+**Fix:** Patch `ImageBitmapLoader.prototype.load` để dùng `arrayBuffer()` thay `blob()` trước khi parse GLTF.
+
+**Vì sao cần patch GLTF JSON:** Metro chỉ serve assets được `require()` tĩnh trong JS bundle. GLTFLoader sẽ dùng relative URIs từ file GLTF (e.g. `textures/Foo.png`, `scene.bin`) — những URI này không resolve được qua Metro. Cần fetch GLTF JSON, patch image URIs và buffer URI sang Metro absolute URLs, rồi dùng `loader.parse()`.
 
 ```ts
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader';
-const uri = Image.resolveAssetSource(require('./model.gltf')).uri;
-new GLTFLoader().load(uri, (gltf) => scene.add(gltf.scene));
+import { Image } from 'react-native';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+
+// @ts-ignore — require() tất cả assets để Metro bundle chúng
+const GLTF_ASSET = require('./scene.gltf');
+const BIN_ASSET  = require('./scene.bin');
+const TEX_ASSETS: Record<string, any> = {
+  'textures/Foo_baseColor.png': require('./textures/Foo_baseColor.png'),
+  // ... tất cả textures
+};
+
+// Patch ImageBitmapLoader: dùng arrayBuffer thay blob (RN-WGPU constraint)
+const IBL = (THREE as any).ImageBitmapLoader;
+const origLoad = IBL.prototype.load;
+IBL.prototype.load = function(url: string, onLoad: any, _: any, onError: any) {
+  fetch(url).then(r => r.arrayBuffer()).then(buf => createImageBitmap(buf as any)).then(onLoad).catch(onError);
+  return null;
+};
+
+// Fetch GLTF JSON, patch URIs → Metro absolute URLs
+const gltfText = await fetch(Image.resolveAssetSource(GLTF_ASSET).uri).then(r => r.text());
+const gltfJson = JSON.parse(gltfText);
+for (const img of gltfJson.images ?? []) {
+  if (img.uri && TEX_ASSETS[img.uri])
+    img.uri = Image.resolveAssetSource(TEX_ASSETS[img.uri]).uri;
+}
+for (const buf of gltfJson.buffers ?? []) {
+  if (buf.uri?.endsWith('.bin'))
+    buf.uri = Image.resolveAssetSource(BIN_ASSET).uri;
+}
+
+const loader = new GLTFLoader();
+const gltf = await new Promise<any>((resolve, reject) => {
+  loader.parse(JSON.stringify(gltfJson), '', resolve, reject);
+});
+IBL.prototype.load = origLoad; // restore sau khi parse xong
+scene.add(gltf.scene);
+```
+
+**Tóm tắt 4 bước bắt buộc:**
+1. `require()` tất cả assets tĩnh (gltf, bin, mọi texture png) → Metro bundle
+2. Pre-fetch GLTF JSON + **bin file** đồng thời (`Promise.all`)
+3. Embed bin dưới dạng base64 data URI trong `gltfJson.buffers[0].uri` — **KHÔNG** dùng Metro HTTP URI vì `loader.parse()` sẽ fetch lại 13MB làm hang toàn bộ
+4. Patch `ImageBitmapLoader.prototype.load` dùng `arrayBuffer()` thay `blob()`, rồi `loader.parse()`
+
+```ts
+// Step 2: pre-fetch cả gltf + bin
+const [gltfText, binBuf] = await Promise.all([
+  fetch(Image.resolveAssetSource(GLTF_ASSET).uri).then(r => r.text()),
+  fetch(Image.resolveAssetSource(BIN_ASSET).uri).then(r => r.arrayBuffer()),
+]);
+// Step 3: embed bin as base64 (chunked btoa để tránh stack overflow)
+const bytes = new Uint8Array(binBuf);
+let b64 = '';
+for (let i = 0; i < bytes.length; i += 0x8000)
+  b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 0x8000)));
+for (const buf of gltfJson.buffers ?? [])
+  if (buf.uri?.endsWith('.bin'))
+    buf.uri = 'data:application/octet-stream;base64,' + b64;
 ```
 
 ### 4.4 Lưu ý chuyển OBJ → GLTF/GLB
@@ -208,15 +271,41 @@ await renderer.renderAsync(scene, camera);
 
 ---
 
+## 8c. Shadows trong react-native-wgpu (đã verified)
+
+**Chỉ VSMShadowMap hoạt động.** PCFShadowMap dùng `textureSampleCompare` (depth comparison sampler) — Dawn trong react-native-wgpu không support → **canvas trắng/blank hoàn toàn**.
+
+```ts
+const renderer = makeWebGPURenderer(context as any);
+await renderer.init();          // BẮT BUỘC await trước khi set shadowMap
+(renderer as any).shadowMap.enabled = true;
+(renderer as any).shadowMap.type = VSMShadowMap;  // ✅ hoạt động
+// (renderer as any).shadowMap.type = PCFShadowMap; // ❌ canvas trắng
+
+// Light config để tránh shadow bị blurry
+dir.castShadow = true;
+dir.shadow.mapSize.width = 2048;
+dir.shadow.mapSize.height = 2048;
+(dir.shadow as any).radius = 1;   // default quá cao → blur; đặt 1 cho sharp
+dir.shadow.camera.left = -20; dir.shadow.camera.right = 20;
+dir.shadow.camera.top = 20; dir.shadow.camera.bottom = -20;
+```
+
+**Lý do `enabled` phải set sau `await init()`:** Three.js WebGPU renderer check `renderer.shadowMap.enabled` trong `AnalyticLightNode.js:208`. Nếu set trước khi init, một số path khởi tạo có thể override lại về false.
+
+---
+
 ## 9. Bugs & gotchas đã hit thực tế
 
 1. **`createImageBitmap` chỉ nhận `ArrayBuffer`** — không phải Blob. Dùng `.arrayBuffer()` thay `.blob()`.
 2. **OBJLoader trên RN**: dùng `OBJLoader().parse(text)`, không dùng `.load(url)`.
-3. **Metro alias `three/addons/`**: import không có `.js` suffix — `'three/addons/loaders/OBJLoader'` ✓, `'three/addons/loaders/OBJLoader.js'` ✗.
-4. **Port Metro**: RN CLI bake port vào binary lúc build. Cần set `RCT_METRO_PORT` trong `GCC_PREPROCESSOR_DEFINITIONS` của Podfile trước `pod install`. Default 8081, đổi sang 8088 cần rebuild native.
-5. **iOS Simulator x86_64 + Rosetta**: WebGPU emulated, FPS thấp hơn device thật ~2-3 lần.
-6. **`document.createElement`** → không có DOM trong RN, phải rewrite thành React component.
-7. **MetalView off-main-thread warning**: renderer chạy từ JS thread, có thể thấy warning nhưng không crash.
+3. **GLTFLoader + textures trên RN**: `ImageBitmapLoader` dùng `blob()` → crash vì RN-WGPU chỉ nhận `ArrayBuffer`. Phải patch `ImageBitmapLoader.prototype.load` để dùng `arrayBuffer()`. Kết hợp patch GLTF JSON để replace relative URIs với Metro absolute URLs (xem mục 4.3).
+4. **PCFShadowMap → canvas trắng**: Dawn không support `textureSampleCompare`. Chỉ dùng `VSMShadowMap`. Set `shadowMap.enabled` SAU `await renderer.init()`.
+5. **Metro alias `three/addons/`**: import không có `.js` suffix — `'three/addons/loaders/OBJLoader'` ✓, `'three/addons/loaders/OBJLoader.js'` ✗.
+6. **Port Metro**: RN CLI bake port vào binary lúc build. Cần set `RCT_METRO_PORT` trong `GCC_PREPROCESSOR_DEFINITIONS` của Podfile trước `pod install`. Default 8081, đổi sang 8088 cần rebuild native.
+7. **iOS Simulator x86_64 + Rosetta**: WebGPU emulated, FPS thấp hơn device thật ~2-3 lần.
+8. **`document.createElement`** → không có DOM trong RN, phải rewrite thành React component.
+9. **MetalView off-main-thread warning**: renderer chạy từ JS thread, có thể thấy warning nhưng không crash.
 
 ---
 
