@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Animated } from 'react-native';
 import {
   StatusBar,
   StyleSheet,
@@ -15,10 +16,10 @@ import {
   Clock,
   Color,
   DirectionalLight,
-  PCFSoftShadowMap,
   PerspectiveCamera,
   Scene,
   Vector3,
+  VSMShadowMap,
 } from 'three';
 
 import { makeWebGPURenderer } from '../three-helpers/makeWebGPURenderer';
@@ -69,6 +70,22 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
   const [nameInput, setNameInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [fps, setFps] = useState(0);
+  const scoreAnim = useRef(new Animated.Value(1)).current;
+  const scoreOpacity = useRef(new Animated.Value(1)).current;
+
+  const triggerScoreAnim = useCallback(() => {
+    scoreAnim.setValue(0.6);
+    scoreOpacity.setValue(1);
+    Animated.parallel([
+      Animated.spring(scoreAnim, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }),
+      Animated.sequence([
+        Animated.delay(600),
+        Animated.timing(scoreOpacity, { toValue: 0.4, duration: 300, useNativeDriver: true }),
+        Animated.timing(scoreOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, []);
+
   const log = (msg: string) => {
     console.log('[GAME]', msg);
   };
@@ -144,18 +161,21 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
       const dir = new DirectionalLight(0xffffff, 1.5);
       dir.position.set(12, 20, -5);
       dir.castShadow = true;
-      dir.shadow.mapSize.width = 1024;
-      dir.shadow.mapSize.height = 1024;
-      dir.shadow.camera.left = -30;
-      dir.shadow.camera.right = 30;
-      dir.shadow.camera.top = 30;
-      dir.shadow.camera.bottom = -30;
+      dir.shadow.mapSize.width = 2048;
+      dir.shadow.mapSize.height = 2048;
+      (dir.shadow as any).radius = 1; // VSMShadowMap blur radius — 1 = sharpest
+      dir.shadow.camera.left = -20;
+      dir.shadow.camera.right = 20;
+      dir.shadow.camera.top = 20;
+      dir.shadow.camera.bottom = -20;
       scene.add(dir);
       scene.add(dir.target);
 
       log('creating renderer...');
       const renderer = makeWebGPURenderer(context as any);
       await renderer.init();
+      (renderer as any).shadowMap.enabled = true;
+      (renderer as any).shadowMap.type = VSMShadowMap;
       rendererRef.current = renderer;
       log('renderer ready ' + width + 'x' + height);
 
@@ -173,6 +193,9 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
         child.position.y -= bbox.min.y;
       });
       chicken.position.set(0, 0.25, 0);
+      chicken.traverse((node: any) => {
+        if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+      });
       scene.add(chicken);
       pouletRef.current = chicken;
 
@@ -283,6 +306,7 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
         if (s !== lastScore) {
           lastScore = s;
           setScore(s);
+          if (s > 0) triggerScoreAnim();
         }
         updateEnvironment();
         // Camera slides with character (same angle, no lookAt per frame)
@@ -370,9 +394,16 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
 
         {started && (
           <>
-            {/* HUD top */}
+            {/* Score center */}
+            <Animated.View
+              style={[s.scoreCenterWrap, { opacity: scoreOpacity, transform: [{ scale: scoreAnim }] }]}
+              pointerEvents="none"
+            >
+              <Animated.Text style={s.scoreBig}>{score}</Animated.Text>
+            </Animated.View>
+
+            {/* HUD top-left */}
             <View style={[s.hudTop, { top: insets.top + 8 }]} pointerEvents="none">
-              <Text style={s.scoreText}>Score: {score}</Text>
               <Text style={s.bestText}>Best: {bestScore}</Text>
               {fps > 0 && <Text style={s.fpsText}>{fps} FPS</Text>}
               {userName ? <Text style={s.nameText}>{userName}</Text> : null}
@@ -461,6 +492,8 @@ const s = StyleSheet.create({
 
   // HUD
   hudTop: { position: 'absolute', left: 16 },
+  scoreCenterWrap: { position: 'absolute', top: 60, left: 0, right: 0, alignItems: 'center' },
+  scoreBig: { color: '#fff', fontSize: 72, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 8, textShadowOffset: { width: 0, height: 3 } },
   scoreText: { color: '#fff', fontFamily: 'Menlo', fontSize: 22, fontWeight: '700', textShadowColor: '#000', textShadowRadius: 4 },
   bestText: { color: '#cfd', fontFamily: 'Menlo', fontSize: 14, marginTop: 2, textShadowColor: '#000', textShadowRadius: 4 },
   nameText: { color: '#fffd', fontFamily: 'Menlo', fontSize: 12, marginTop: 4, textShadowColor: '#000', textShadowRadius: 4 },

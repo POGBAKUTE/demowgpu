@@ -130,6 +130,10 @@ export async function getNext(x, y, z) {
         randomKey = 'grass';
     }
     const randomEnv = envs[randomKey].clone();
+    // Ground tile receives shadows
+    randomEnv.traverse((node) => {
+        if (node.isMesh) { node.receiveShadow = true; }
+    });
     if (randomKey === 'grass') {
         const treeCount = Math.floor(Math.random() * 5) + 1;
         for (let i = 0; i < treeCount; i++) {
@@ -138,6 +142,7 @@ export async function getNext(x, y, z) {
             tree.traverse((node) => {
                 if (node.isMesh) {
                     node.castShadow = true;
+                    node.receiveShadow = true;
                 }
             });
             const randomX = Math.floor(Math.random() * 16 - 8);
@@ -167,6 +172,9 @@ export async function getNext(x, y, z) {
                 randomX = Math.floor(Math.random() * 16 - 8);
             }
 
+            wood.traverse((node) => {
+                if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+            });
             wood.position.set(randomX, -0.5, Math.floor(z));
             wood.userData = { size: woodKey[4], position: { x: randomX, z: Math.floor(z) } };
             woods.push(wood);
@@ -184,6 +192,9 @@ export async function getNext(x, y, z) {
                 randomX = Math.floor(Math.random() * 16 - 8);
                 attempts++;
             } while (cars.some(car => Math.abs(car.position.x - randomX) < 2 && Math.floor(car.position.z) === Math.floor(z)) && attempts < 4);
+            voiture.traverse((node) => {
+                if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+            });
             voiture.position.set(Math.floor(randomX), 0, Math.floor(z));
             voiture.rotation.y = Math.PI / 2;
             cars.push(voiture);
