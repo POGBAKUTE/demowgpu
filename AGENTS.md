@@ -464,7 +464,66 @@ Tất cả 7 characters load OBJ + PNG texture thành công, environment (grass/
 
 ---
 
-## 13. References
+## 13. Expo Web — export Three.js game ra web
+
+### Tổng quan
+
+Dùng **Expo Web** (React Native Web) để reuse toàn bộ codebase RN, chỉ swap renderer.
+
+- `View/Text/TouchableOpacity/StyleSheet` → tự map sang HTML/CSS bởi RNW
+- Three.js scene, camera, lighting, animation loop → giữ 100%
+- Game logic JS (`moove.js`, `environement.js`, v.v.) → giữ 100%
+- `react-native-wgpu` → mock/swap ra DOM canvas trên web
+
+### makeRenderer util — pattern chuẩn
+
+```ts
+// src/three-helpers/makeRenderer.ts
+export async function makeRenderer(canvas: any, platform: 'rn' | 'web') {
+  if (platform === 'rn') {
+    const { makeWebGPURenderer } = await import('./makeWebGPURenderer');
+    const context = canvas.getContext('webgpu');
+    const renderer = makeWebGPURenderer(context);
+    await renderer.init();
+    return { renderer, present: () => context.present() };
+  } else {
+    const THREE = await import('three');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    return { renderer, present: () => {} };  // no-op trên web
+  }
+}
+
+// Dùng trong mọi screen:
+const { renderer, present } = await makeRenderer(canvasEl, Platform.OS === 'web' ? 'web' : 'rn');
+renderer.setAnimationLoop(() => {
+  renderer.render(scene, camera);
+  present();  // WebGPU RN: push frame; Web: no-op
+});
+```
+
+### Những gì cần đổi khi thêm Expo Web
+
+| Phần | RN hiện tại | Web |
+|------|------------|-----|
+| Renderer | `makeWebGPURenderer` + `context.present()` | `THREE.WebGLRenderer` |
+| Canvas mount | `<Canvas>` từ react-native-wgpu | DOM `<canvas>` ref |
+| UI overlay | RN components (giữ nguyên) | RNW tự convert |
+| `react-native-wgpu` import | native module | mock empty module |
+| Performance | WebGPU via Dawn (slower on simulator) | WebGL2 native (60fps stable) |
+
+### Mock react-native-wgpu cho web
+
+```js
+// src/mocks/react-native-wgpu.web.ts
+export const Canvas = ({ style, ...props }: any) => <canvas {...props} style={style} />;
+export type CanvasRef = HTMLCanvasElement;
+```
+
+Khai báo trong `package.json` hoặc `metro.config.js` để resolve đúng platform.
+
+---
+
+## 14. References
 
 - `react-native-wgpu`: https://github.com/wcandillon/react-native-webgpu
 - Three.js WebGPU: https://threejs.org/docs/#manual/en/introduction/How-to-use-WebGPU-with-three.js

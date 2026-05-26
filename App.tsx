@@ -8,6 +8,8 @@ import { ThreeWGPUBoxClone } from './src/screens/ThreeWGPUBoxClone';
 import { ThreeWGPUPhysics as ThreeWGPUPhysicsCannon } from './src/screens/ThreeWGPUPhysicsCannon';
 import { ThreeWGPUPhysicsRapier } from './src/screens/ThreeWGPUPhysicsRapier';
 import { CrossyRoadGame } from './src/screens/CrossyRoadGame';
+import { PorscheViewer } from './src/screens/PorscheViewer';
+import { MichelleViewer } from './src/screens/MichelleViewer';
 
 type ScreenItem = { name: string; title: string; subtitle: string };
 
@@ -16,6 +18,8 @@ const SCREENS: ScreenItem[] = [
   { name: 'PhysicsCannon', title: 'Physics — cannon-es (JS)', subtitle: '40 boxes, pure JS' },
   { name: 'PhysicsRapier', title: 'Physics — Rapier (WASM)', subtitle: '80 boxes, Rust→WASM' },
   { name: 'CrossyRoad', title: 'Crossy Road (ported)', subtitle: 'swipe to move, port from web Three.js game' },
+  { name: 'Porsche', title: 'Porsche 911 GT3', subtitle: 'GLTF model viewer, auto-rotate' },
+  { name: 'Michelle', title: 'Michelle', subtitle: 'animated character, Three.js GLTF' },
 ];
 
 const Stack = createNativeStackNavigator();
@@ -50,6 +54,8 @@ export default function App() {
           <Stack.Screen name="PhysicsCannon" component={ThreeWGPUPhysicsCannon} options={{ title: 'Cannon (JS)' }} />
           <Stack.Screen name="PhysicsRapier" component={ThreeWGPUPhysicsRapier} options={{ title: 'Rapier (WASM)' }} />
           <Stack.Screen name="CrossyRoad" component={CrossyRoadGame} options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="Porsche" component={PorscheViewer} options={{ title: 'Porsche 911 GT3' }} />
+          <Stack.Screen name="Michelle" component={MichelleViewer} options={{ title: 'Michelle' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
