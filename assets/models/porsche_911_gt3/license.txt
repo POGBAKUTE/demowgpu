@@ -1,0 +1,11 @@
+Model Information:
+* title:	Porsche 911 GT3
+* source:	https://sketchfab.com/3d-models/porsche-911-gt3-593c83f3662a4a45a016f95dedd9f243
+* author:	Outlaw Games™ (https://sketchfab.com/Outlaw_Games)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Porsche 911 GT3" (https://sketchfab.com/3d-models/porsche-911-gt3-593c83f3662a4a45a016f95dedd9f243) by Outlaw Games™ (https://sketchfab.com/Outlaw_Games) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
