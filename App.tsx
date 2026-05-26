@@ -49,7 +49,7 @@ export default function App() {
           <Stack.Screen name="BoxClone" component={ThreeWGPUBoxClone} options={{ title: 'Box' }} />
           <Stack.Screen name="PhysicsCannon" component={ThreeWGPUPhysicsCannon} options={{ title: 'Cannon (JS)' }} />
           <Stack.Screen name="PhysicsRapier" component={ThreeWGPUPhysicsRapier} options={{ title: 'Rapier (WASM)' }} />
-          <Stack.Screen name="CrossyRoad" component={CrossyRoadGame} options={{ title: 'Crossy Road' }} />
+          <Stack.Screen name="CrossyRoad" component={CrossyRoadGame} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

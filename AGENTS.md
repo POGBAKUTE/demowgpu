@@ -4,6 +4,15 @@ Tổng hợp kiến thức từ thực nghiệm port game three.js (Crossy Road 
 
 ---
 
+## 0. Dev environment — port & Metro
+
+- **Metro port cho project này: 8086** (đã được bake vào iOS Simulator build).
+- Start Metro: `npm run start -- --port 8086`
+- iOS Simulator đã được cấu hình dùng port 8086 — KHÔNG cần rebuild native, KHÔNG cần kill Metro project khác.
+- Hot reload hoạt động bình thường khi Metro chạy đúng port 8086.
+
+---
+
 ## 1. Stack tổng quan
 
 - **Renderer**: `react-native-wgpu` (Shopify) — expose WebGPU native qua Dawn → Metal (iOS) / Vulkan (Android). Không phải bridge JS như expo-gl.
@@ -174,6 +183,31 @@ Game medium (~1000 LOC): **1-2 ngày** với người đã quen RN + Three.
 
 ---
 
+## 8b. Pattern render ĐÚNG cho CrossyRoadGame (đã verified)
+
+```ts
+// ✅ ĐÚNG — phải await init, dùng sync render
+const renderer = makeWebGPURenderer(context as any);
+await renderer.init();           // BẮT BUỘC await
+renderer.render(scene, camera);  // sync render trong animate loop
+(context as any).present();
+
+// ❌ SAI — render trước khi init xong → Three.js crash nội bộ (property not exist)
+renderer.init();                 // không await → animate chạy trước init xong
+renderer.render(scene, camera);  // crash
+
+// ❌ SAI — renderAsync trong setAnimationLoop → frames chồng lên nhau → canvas đen
+await renderer.renderAsync(scene, camera);
+```
+
+**Lý do:** Three.js WebGPU renderer build lazy-init node/pipeline khi `render()` được gọi lần đầu. Nếu `init()` chưa resolve (Promise pending), node backend chưa sẵn sàng → internal error "Property X doesn't exist".
+
+**Canvas mount:** Canvas phải luôn được mount (không conditional render). Nếu có start screen, dùng `absoluteFill` overlay lên trên Canvas, KHÔNG unmount Canvas.
+
+**Debug tip:** Canvas đen mà không có error → check `context.present()` có được gọi không. Canvas đen + error trong Three.js → check `await renderer.init()`.
+
+---
+
 ## 9. Bugs & gotchas đã hit thực tế
 
 1. **`createImageBitmap` chỉ nhận `ArrayBuffer`** — không phải Blob. Dùng `.arrayBuffer()` thay `.blob()`.
@@ -213,36 +247,131 @@ RNSound podspec không khai báo AVFoundation. Phải link thủ công vào xcod
 
 ---
 
-## 12. MCP ios-simulator-mcp — debug simulator từ Claude Code
+## 12. AI điều khiển iOS Simulator để test game
 
-**Model Context Protocol (MCP)** là chuẩn để AI client (Claude, Cursor...) gọi tool bên ngoài.
+### Trạng thái hiện tại (đã verify)
 
-### Kiến trúc
-```
-Claude Code  ←→  MCP Server (ios-simulator-mcp)  ←→  idb  ←→  iOS Simulator
-   (AI)            (Node.js process)              (CLI)     (xcrun simctl)
-```
+**`mobile` MCP** (`mcp__mobile__screen`, `mcp__mobile__app`) — đã cài, hoạt động:
+- `screen(action:'capture')` → screenshot simulator ✅
+- `app(action:'restart', package:'org.reactjs.native.example.demoWGPU2')` → restart app ✅
+- `input(action:'tap')` → **KHÔNG hoạt động** (cần Appium/WebDriverAgent chưa cài) ❌
+- `input(action:'swipe')` → **KHÔNG hoạt động** (cần WebDriverAgent) ❌
 
-### Setup (1 lần duy nhất)
+**`idb`** (`/usr/local/bin/idb`) — đã cài, dùng cho tap/screenshot:
+- `idb ui tap <x> <y> --udid <UDID>` → tap tại device coordinates ✅
+- `idb ui swipe <x1> <y1> <x2> <y2> --duration <s> --udid <UDID>` → **KHÔNG trigger RN Fling gesture** ❌
+- `idb ui describe-all --udid <UDID>` → lấy exact element positions (device coordinates) ✅
+- `idb screenshot <file> --udid <UDID>` → screenshot ✅
+- UDID của iPhone 17 Pro Max: `C765A109-F549-4F38-B42E-548F45E38ADD`
+
+**Fling gesture (React Native)** — không trigger được bằng automation:
+- `idb ui swipe` không đủ velocity để trigger `Gesture.Fling()` từ react-native-gesture-handler
+- Cần Appium/WebDriverAgent hoặc native XCTest injection để trigger
+- **Workaround**: test logic code thủ công, không cần swipe để verify game load
+
+### Cách tap đúng: dùng idb với device coordinates
+
 ```bash
-claude mcp add ios-simulator -- npx -y ios-simulator-mcp
+UDID="C765A109-F549-4F38-B42E-548F45E38ADD"
+
+# Lấy exact coordinates của elements trên màn hình hiện tại
+idb ui describe-all --udid $UDID | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for item in data:
+    label = item.get('AXLabel','')
+    frame = item.get('frame',{})
+    if label:
+        cx = frame.get('x',0) + frame.get('width',0)/2
+        cy = frame.get('y',0) + frame.get('height',0)/2
+        print(f'{label[:50]}: ({cx:.0f},{cy:.0f})')
+"
+
+# Tap vào element
+idb ui tap 220 473 --udid $UDID
+
+# Back về home
+osascript -e 'tell application "Simulator" to activate' \
+  -e 'tell application "System Events" to key code 33 using command down'
+
+# Screenshot
+idb screenshot /tmp/screen.png --udid $UDID
+
+# Chụp screenshot (mobile MCP - tốt hơn cho AI đọc)
+# mcp__mobile__screen(action:'capture', preset:'medium')
 ```
-Ghi vào `~/.claude.json`:
-```json
-{
-  "mcpServers": {
-    "ios-simulator": { "command": "npx", "args": ["-y", "ios-simulator-mcp"] }
-  }
+
+**Tọa độ Crossy Road start screen (device coordinates, iPhone 17 Pro Max):**
+| Element | x | y |
+|---------|---|---|
+| Chicken button | 90 | 544 |
+| Palmer button | 178 | 544 |
+| Juwan button | 262 | 544 |
+| Wheeler button | 349 | 544 |
+| Avocoder button | 142 | 589 |
+| Bacon button | 233 | 589 |
+| Brent button | 311 | 589 |
+| START button | 220 | 658 |
+
+**Tọa độ home list (device coordinates):**
+| Item | x | y |
+|------|---|---|
+| Three WGPU Box | 220 | 235 |
+| Physics cannon-es | 220 | 315 |
+| Physics Rapier | 220 | 395 |
+| Crossy Road | 220 | 473 |
+
+**Lưu ý quan trọng:**
+- Dùng `idb ui describe-all` để lấy exact coordinates — không đoán
+- Luôn delay ≥ 1.5s giữa back và click tiếp theo
+- Reload JS: Cmd+D → Reload (hoặc Cmd+R trong simulator)
+
+### Script test tất cả characters
+
+```bash
+UDID="C765A109-F549-4F38-B42E-548F45E38ADD"
+
+go_to_start_screen() {
+  osascript -e 'tell application "Simulator" to activate' \
+    -e 'tell application "System Events" to key code 33 using command down'
+  sleep 1.5
+  idb ui tap 220 473 --udid $UDID
+  sleep 2
 }
+
+test_char() {
+  local name=$1 cx=$2 cy=$3
+  idb ui tap $cx $cy --udid $UDID   # select character
+  sleep 0.3
+  idb ui tap 220 658 --udid $UDID   # START
+  sleep 7
+  idb screenshot /tmp/char_${name}.png --udid $UDID
+  go_to_start_screen
+}
+
+go_to_start_screen
+test_char chicken  90  544
+test_char palmer  178  544
+test_char juwan   262  544
+test_char wheeler 349  544
+test_char avocoder 142 589
+test_char bacon   233  589
+test_char brent   311  589
 ```
 
-### Cách hoạt động
-- Claude Code spawn process `ios-simulator-mcp` khi khởi động
-- MCP server đăng ký tool: `ui_tap`, `ui_swipe`, `screenshot`...
-- Claude gọi `mcp__ios-simulator__screenshot` như tool nội bộ
+### Kết quả test characters (đã verify 2026-05-26)
 
-### Dùng với client khác
-Cùng config dùng cho: Cursor (Settings → MCP), Claude Desktop (`claude_desktop_config.json`), Cline/Roo Code trong VS Code.
+| Character | Load | Env render | FPS | Ghi chú |
+|-----------|------|-----------|-----|---------|
+| Chicken | ✅ | ✅ | 60 | Default |
+| Palmer | ✅ | ✅ | 60 | |
+| Juwan | ✅ | ✅ | 60 | |
+| Wheeler | ✅ | ✅ | 60 | |
+| Avocoder | ✅ | ✅ | 60 | |
+| Bacon | ✅ | ✅ | 60 | Pink pig, clearly visible |
+| Brent | ✅ | ✅ | 60 | Humanoid, clearly visible |
+
+Tất cả 7 characters load OBJ + PNG texture thành công, environment (grass/road/river/logs/cars/trees) render đúng.
 
 ---
 

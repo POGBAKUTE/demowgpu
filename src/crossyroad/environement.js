@@ -126,7 +126,7 @@ export async function getNext(x, y, z) {
             }
         }
     }
-    if (z == 0) {
+    if (z == 0 || z == 1) {
         randomKey = 'grass';
     }
     const randomEnv = envs[randomKey].clone();
@@ -141,7 +141,8 @@ export async function getNext(x, y, z) {
                 }
             });
             const randomX = Math.floor(Math.random() * 16 - 8);
-            if (z === 0 && randomX === 0) {
+            // Keep a 3-wide clear corridor at spawn rows so player isn't trapped
+            if ((z === 0 || z === 1) && Math.abs(randomX) <= 1) {
                 continue;
             }
             tree.position.set(randomX, 0.4, 0);
@@ -192,5 +193,12 @@ export async function getNext(x, y, z) {
     randomEnv.scale.set(1, 1, 1);
     blockPosition.push({ nature: randomKey, z: Math.floor(z) });
     return randomEnv;
+}
+
+export function resetEnvironment() {
+    blockPosition.length = 0;
+    treePositions.length = 0;
+    woods.length = 0;
+    cars.length = 0;
 }
 

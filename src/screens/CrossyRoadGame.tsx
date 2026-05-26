@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  Directions,
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-} from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Canvas, type CanvasRef } from 'react-native-wgpu';
 import {
   AmbientLight,
@@ -22,13 +18,14 @@ import {
   PCFSoftShadowMap,
   PerspectiveCamera,
   Scene,
+  Vector3,
 } from 'three';
 
 import { makeWebGPURenderer } from '../three-helpers/makeWebGPURenderer';
 // @ts-ignore plain .js files
 import { loadModel } from '../crossyroad/loader.js';
 // @ts-ignore
-import { getNext, woods, cars, isHitByCar } from '../crossyroad/environement.js';
+import { getNext, woods, cars, isHitByCar, resetEnvironment } from '../crossyroad/environement.js';
 // @ts-ignore
 import { movePoulet, loose, moveCamera } from '../crossyroad/moove.js';
 // @ts-ignore
@@ -60,7 +57,8 @@ const CHARACTERS: { id: string; label: string; path: string }[] = [
   { id: 'brent', label: 'Brent', path: 'assets/models/characters/brent/0.obj' },
 ];
 
-export const CrossyRoadGame = () => {
+export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
+  const insets = useSafeAreaInsets();
   const ref = useRef<CanvasRef>(null);
   const [score, setScore] = useState(0);
   const [over, setOver] = useState(false);
@@ -70,6 +68,10 @@ export const CrossyRoadGame = () => {
   const [userName, setUserNameState] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [fps, setFps] = useState(0);
+  const log = (msg: string) => {
+    console.log('[GAME]', msg);
+  };
 
   const pouletRef = useRef<any>(null);
   const sceneRef = useRef<Scene | null>(null);
@@ -120,11 +122,11 @@ export const CrossyRoadGame = () => {
 
     (async () => {
       try {
-      console.log('[GAME] useEffect started, ref:', !!ref.current);
+      log('useEffect started, ref=' + !!ref.current);
       const context = ref.current!.getContext('webgpu')!;
-      console.log('[GAME] context:', !!context);
+      log('context=' + !!context);
       const { width, height } = (context as any).canvas;
-      console.log('[GAME] canvas size:', width, height);
+      log('canvas ' + width + 'x' + height);
 
       const scene = new Scene();
       sceneRef.current = scene;
@@ -132,8 +134,11 @@ export const CrossyRoadGame = () => {
 
       const camera = new PerspectiveCamera(75, width / height, 0.1, 1000);
       cameraRef.current = camera;
-      camera.position.set(-4, 6.5, -15);
-      camera.lookAt(4, -1, 0);
+      // Camera directly behind character, looking forward-down
+      // Character starts at (0,0.25,0); camera at (0,6,-8) looking at (0,0,4)
+      // → character appears ~65% from top, horizontally centered
+      camera.position.set(0, 4, -5);
+      camera.lookAt(0, 0, 2);
 
       scene.add(new AmbientLight(0xffffff, 0.8));
       const dir = new DirectionalLight(0xffffff, 1.5);
@@ -148,18 +153,25 @@ export const CrossyRoadGame = () => {
       scene.add(dir);
       scene.add(dir.target);
 
-      console.log('[GAME] creating renderer...');
+      log('creating renderer...');
       const renderer = makeWebGPURenderer(context as any);
       await renderer.init();
-      console.log('[GAME] renderer ready');
-      (renderer as any).shadowMap.enabled = true;
-      (renderer as any).shadowMap.type = PCFSoftShadowMap;
       rendererRef.current = renderer;
-      if (disposedRef.current) return;
+      log('renderer ready ' + width + 'x' + height);
 
-      console.log('[GAME] loading model:', characterPath);
+      resetEnvironment();
+      log('loading model: ' + characterPath);
       const chicken = await loadModel(characterPath);
-      console.log('[GAME] model loaded');
+      log('model loaded');
+      // Center model geometry so all characters spawn at same screen position
+      const bbox = new Box3().setFromObject(chicken);
+      const center = new Vector3();
+      bbox.getCenter(center);
+      chicken.children.forEach((child: any) => {
+        child.position.x -= center.x;
+        child.position.z -= center.z;
+        child.position.y -= bbox.min.y;
+      });
       chicken.position.set(0, 0.25, 0);
       scene.add(chicken);
       pouletRef.current = chicken;
@@ -172,6 +184,7 @@ export const CrossyRoadGame = () => {
         addEnvironmentBlock(i);
         whereBlocksRef.current.push(i);
       }
+      log('env blocks queued');
 
       initializeScore();
       const clock = new Clock();
@@ -244,7 +257,6 @@ export const CrossyRoadGame = () => {
       function isLoose() {
         if (isHitByCar(chicken.position.x, chicken.position.z) && !loose.car) {
           loose.car = true;
-          // Death animation: chicken flattened sideways
           chicken.rotation.z = -Math.PI / 2;
           chicken.rotation.x = Math.PI / 2;
           chicken.rotation.y = 0;
@@ -263,6 +275,9 @@ export const CrossyRoadGame = () => {
       }
 
       let lastScore = -1;
+      let frameCount = 0;
+      let fpsFrames = 0;
+      let fpsLast = performance.now();
       const animate = (_t: number) => {
         const s = updateScore(chicken);
         if (s !== lastScore) {
@@ -270,7 +285,9 @@ export const CrossyRoadGame = () => {
           setScore(s);
         }
         updateEnvironment();
-        moveCamera(chicken.position.z - 5, camera);
+        // Camera slides with character (same angle, no lookAt per frame)
+        camera.position.x += (chicken.position.x - camera.position.x) * 0.1;
+        camera.position.z += ((chicken.position.z - 5) - camera.position.z) * 0.1;
         isLoose();
 
         const elapsed = clock.getElapsedTime();
@@ -281,9 +298,18 @@ export const CrossyRoadGame = () => {
 
         renderer.render(scene, camera);
         (context as any).present();
+        frameCount++;
+        fpsFrames++;
+        const now = performance.now();
+        if (now - fpsLast >= 1000) {
+          setFps(Math.round(fpsFrames * 1000 / (now - fpsLast)));
+          fpsFrames = 0;
+          fpsLast = now;
+        }
       };
       animateRef.current = animate;
       renderer.setAnimationLoop(animate);
+      log('animation loop started');
 
       cleanup = () => renderer.setAnimationLoop(null);
       } catch (e: any) {
@@ -298,7 +324,7 @@ export const CrossyRoadGame = () => {
     };
   }, [started, characterPath]);
 
-  const swipe = (dir: 'up' | 'down' | 'left' | 'right') => () => {
+  const move = (dir: 'up' | 'down' | 'left' | 'right') => {
     if (!pouletRef.current || over) return;
     playSound();
     if (dir === 'up') {
@@ -312,78 +338,114 @@ export const CrossyRoadGame = () => {
     movePoulet(pouletRef.current, dir);
   };
 
-  const flingUp = Gesture.Fling().direction(Directions.UP).onEnd(swipe('up'));
-  const flingDown = Gesture.Fling().direction(Directions.DOWN).onEnd(swipe('down'));
-  const flingLeft = Gesture.Fling().direction(Directions.LEFT).onEnd(swipe('left'));
-  const flingRight = Gesture.Fling().direction(Directions.RIGHT).onEnd(swipe('right'));
-  const gesture = Gesture.Race(flingUp, flingDown, flingLeft, flingRight);
-
-  if (!started) {
-    return (
-      <View style={s.startContainer}>
-        <Text style={s.title}>Crossy Road</Text>
-        <Text style={s.subtitle}>Best: {bestScore}</Text>
-        <Text style={s.label}>Pick a character</Text>
-        <View style={s.charRow}>
-          {CHARACTERS.map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              style={[s.charBtn, characterPath === c.path && s.charBtnActive]}
-              onPress={() => setCharacterPath(c.path)}
-            >
-              <Text style={s.charText}>{c.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <TouchableOpacity style={s.startBtn} onPress={beginGame}>
-          <Text style={s.startBtnText}>START</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <GestureDetector gesture={gesture}>
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <Canvas ref={ref} style={{ flex: 1 }} />
-          <View style={s.hud} pointerEvents="none">
-            <Text style={s.scoreText}>Score: {score}</Text>
-            <Text style={s.bestText}>Best: {bestScore}</Text>
-            {userName ? <Text style={s.nameText}>{userName}</Text> : null}
-            {errorMsg ? <Text style={{color:'red',fontSize:11,maxWidth:300}}>{errorMsg}</Text> : null}
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <StatusBar hidden />
+      <Canvas ref={ref} style={{ flex: 1 }} />
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {!started && (
+          <View style={[StyleSheet.absoluteFill, s.startContainer, { paddingTop: insets.top + 16 }]}>
+            <Text style={s.title}>Crossy Road</Text>
+            <Text style={s.subtitle}>Best: {bestScore}</Text>
+            <Text style={s.label}>Pick a character</Text>
+            <View style={s.charRow}>
+              {CHARACTERS.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[s.charBtn, characterPath === c.path && s.charBtnActive]}
+                  onPress={() => setCharacterPath(c.path)}
+                >
+                  <Text style={s.charText}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={s.startBtn} onPress={beginGame}>
+              <Text style={s.startBtnText}>START</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+              <Text style={s.backBtnText}>← Back</Text>
+            </TouchableOpacity>
           </View>
-          {over && (
-            <View style={s.overlay}>
-              <Text style={s.gameOver}>Game Over</Text>
-              <Text style={s.finalScore}>Score: {score}</Text>
-              <Text style={s.finalScore}>Best: {bestScore}</Text>
-              {!userName && (
-                <View style={s.nameRow}>
-                  <TextInput
-                    style={s.input}
-                    placeholder="Your name"
-                    placeholderTextColor="#888"
-                    value={nameInput}
-                    onChangeText={setNameInput}
-                  />
-                  <TouchableOpacity style={s.smallBtn} onPress={onSaveName}>
-                    <Text style={s.btnText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              <TouchableOpacity style={s.btn} onPress={restart}>
-                <Text style={s.btnText}>Restart</Text>
+        )}
+
+        {started && (
+          <>
+            {/* HUD top */}
+            <View style={[s.hudTop, { top: insets.top + 8 }]} pointerEvents="none">
+              <Text style={s.scoreText}>Score: {score}</Text>
+              <Text style={s.bestText}>Best: {bestScore}</Text>
+              {fps > 0 && <Text style={s.fpsText}>{fps} FPS</Text>}
+              {userName ? <Text style={s.nameText}>{userName}</Text> : null}
+              {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
+            </View>
+
+            {/* Top-right: Back + Home buttons */}
+            <View style={[s.topRight, { top: insets.top + 8 }]}>
+              <TouchableOpacity style={s.navBtn} onPress={() => { rendererRef.current?.setAnimationLoop(null); setStarted(false); setOver(false); setScore(0); initializeScore(); }}>
+                <Text style={s.navBtnText}>{'< Menu'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.navBtn} onPress={() => navigation.navigate('Home')}>
+                <Text style={s.navBtnText}>Home</Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
-      </GestureDetector>
-    </GestureHandlerRootView>
+
+            {/* D-pad controls */}
+            {!over && (
+              <View style={[s.dpad, { bottom: insets.bottom + 8 }]}>
+                <TouchableOpacity style={s.dBtn} onPress={() => move('up')}>
+                  <Text style={s.dBtnText}>▲</Text>
+                </TouchableOpacity>
+                <View style={s.dRow}>
+                  <TouchableOpacity style={s.dBtn} onPress={() => move('left')}>
+                    <Text style={s.dBtnText}>◀</Text>
+                  </TouchableOpacity>
+                  <View style={s.dCenter} />
+                  <TouchableOpacity style={s.dBtn} onPress={() => move('right')}>
+                    <Text style={s.dBtnText}>▶</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={s.dBtn} onPress={() => move('down')}>
+                  <Text style={s.dBtnText}>▼</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
+
+        {over && (
+          <View style={s.overlay}>
+            <Text style={s.gameOver}>Game Over</Text>
+            <Text style={s.finalScore}>Score: {score}</Text>
+            <Text style={s.finalScore}>Best: {bestScore}</Text>
+            {!userName && (
+              <View style={s.nameRow}>
+                <TextInput
+                  style={s.input}
+                  placeholder="Your name"
+                  placeholderTextColor="#888"
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                />
+                <TouchableOpacity style={s.smallBtn} onPress={onSaveName}>
+                  <Text style={s.btnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <TouchableOpacity style={s.btn} onPress={restart}>
+              <Text style={s.btnText}>Restart</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.btn, { backgroundColor: '#73d6ff', marginTop: 10 }]} onPress={() => navigation.navigate('Home')}>
+              <Text style={[s.btnText, { color: '#0a0e1a' }]}>Home</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </View>
   );
 };
 
 const s = StyleSheet.create({
+  // Start screen
   startContainer: { flex: 1, backgroundColor: '#0a0e1a', alignItems: 'center', justifyContent: 'center', padding: 24 },
   title: { color: '#fff', fontSize: 42, fontWeight: '800' },
   subtitle: { color: '#9ab', fontSize: 16, marginTop: 4, marginBottom: 24 },
@@ -394,12 +456,30 @@ const s = StyleSheet.create({
   charText: { color: '#fff', fontSize: 14 },
   startBtn: { paddingVertical: 14, paddingHorizontal: 48, backgroundColor: '#73d6ff', borderRadius: 12 },
   startBtnText: { color: '#0a0e1a', fontSize: 20, fontWeight: '800' },
+  backBtn: { marginTop: 20, paddingVertical: 10, paddingHorizontal: 24 },
+  backBtnText: { color: '#9ab', fontSize: 16 },
 
-  hud: { position: 'absolute', top: 60, left: 16 },
+  // HUD
+  hudTop: { position: 'absolute', left: 16 },
   scoreText: { color: '#fff', fontFamily: 'Menlo', fontSize: 22, fontWeight: '700', textShadowColor: '#000', textShadowRadius: 4 },
   bestText: { color: '#cfd', fontFamily: 'Menlo', fontSize: 14, marginTop: 2, textShadowColor: '#000', textShadowRadius: 4 },
   nameText: { color: '#fffd', fontFamily: 'Menlo', fontSize: 12, marginTop: 4, textShadowColor: '#000', textShadowRadius: 4 },
+  fpsText: { color: '#0f0', fontFamily: 'Menlo', fontSize: 11, marginTop: 2, textShadowColor: '#000', textShadowRadius: 3 },
+  errorText: { color: 'red', fontSize: 11, maxWidth: 300 },
 
+  // Top-right nav buttons
+  topRight: { position: 'absolute', right: 12, flexDirection: 'row', gap: 6 },
+  navBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  navBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+
+  // D-pad
+  dpad: { position: 'absolute', alignSelf: 'center', alignItems: 'center', gap: 2 },
+  dRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  dCenter: { width: 56, height: 56 },
+  dBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  dBtnText: { color: '#fff', fontSize: 22, fontWeight: '700' },
+
+  // Game over overlay
   overlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
   gameOver: { color: '#fff', fontSize: 36, fontWeight: '800' },
   finalScore: { color: '#fff', fontSize: 18, marginTop: 4 },
