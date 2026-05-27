@@ -171,6 +171,11 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
       scene.add(dir);
       scene.add(dir.target);
 
+      const adapter = await (navigator as any).gpu?.requestAdapter?.();
+      if (!adapter) {
+        setErrorMsg('WebGPU not supported on this device');
+        return;
+      }
       log('creating renderer...');
       const renderer = makeWebGPURenderer(context as any);
       await renderer.init();
@@ -386,6 +391,7 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
             <TouchableOpacity style={s.startBtn} onPress={beginGame}>
               <Text style={s.startBtnText}>START</Text>
             </TouchableOpacity>
+            {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
             <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
               <Text style={s.backBtnText}>← Back</Text>
             </TouchableOpacity>

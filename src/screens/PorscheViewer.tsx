@@ -1,45 +1,52 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Image, PanResponder, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, PanResponder, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Canvas, type CanvasRef } from 'react-native-wgpu';
 import 'react-native-wgpu';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import fs from 'react-native-nitro-file-system';
 import { makeWebGPURenderer } from '../three-helpers/makeWebGPURenderer';
 
-// @ts-ignore
-const GLTF_ASSET = require('../../assets/models/porsche_911_gt3/scene.gltf');
-// @ts-ignore
-const BIN_ASSET = require('../../assets/models/porsche_911_gt3/scene.bin');
-
-const TEX_URIS: Record<string, any> = {
-  'textures/Porsche_911GT3_2022BadgeA_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022BadgeA_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022BadgeA_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022BadgeA_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Carbon1_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Carbon1_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Carbon1_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Carbon1_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Coloured_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Coloured_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille1A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille1A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille1A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille1A_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Grille2A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille2A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille2A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille2A_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Grille3A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille3A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille3A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille3A_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Grille4A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille4A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille4A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille4A_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Grille5A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille5A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille5A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille5A_Material_normal.png'),
-  'textures/Porsche_911GT3_2022Grille6A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille6A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille7A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille7A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022Grille7A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022Grille7A_Material_normal.png'),
-  'textures/Porsche_911GT3_2022InteriorA_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022InteriorA_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022InteriorA_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022InteriorA_Material_normal.png'),
-  'textures/Porsche_911GT3_2022InteriorTillingA_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022InteriorTillingA_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022InteriorTillingA_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022InteriorTillingA_Material_normal.png'),
-  'textures/Porsche_911GT3_2022LightA_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022LightA_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022ManufacturerPlateA_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022ManufacturerPlateA_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022_CallipersCalliperA_Zone_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022_CallipersCalliperA_Zone_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022_Wheel1A_3D_3DWheel1A_Material_baseColor.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022_Wheel1A_3D_3DWheel1A_Material_baseColor.png'),
-  'textures/Porsche_911GT3_2022_Wheel1A_3D_3DWheel1A_Material_normal.png': require('../../assets/models/porsche_911_gt3/textures/Porsche_911GT3_2022_Wheel1A_3D_3DWheel1A_Material_normal.png'),
+// asset:// works on both Android (AssetManager) and iOS (Main Bundle).
+// readFileSync (no encoding) returns a NitroBuffer wrapping the underlying
+// ArrayBuffer — JSI zero-copy, no base64 round-trip.
+const readAssetBuf = (rel: string): ArrayBuffer => {
+  const buf = fs.readFileSync('asset://' + rel) as any;
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 };
+const readAssetText = (rel: string): string => fs.readFileSync('asset://' + rel, 'utf8') as string;
+
+// Texture filenames present under porsche/textures/ inside the app bundle
+const TEX_FILES = new Set<string>([
+  'textures/Porsche_911GT3_2022BadgeA_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022BadgeA_Material_normal.png',
+  'textures/Porsche_911GT3_2022Carbon1_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Carbon1_Material_normal.png',
+  'textures/Porsche_911GT3_2022Coloured_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille1A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille1A_Material_normal.png',
+  'textures/Porsche_911GT3_2022Grille2A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille2A_Material_normal.png',
+  'textures/Porsche_911GT3_2022Grille3A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille3A_Material_normal.png',
+  'textures/Porsche_911GT3_2022Grille4A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille4A_Material_normal.png',
+  'textures/Porsche_911GT3_2022Grille5A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille5A_Material_normal.png',
+  'textures/Porsche_911GT3_2022Grille6A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille7A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022Grille7A_Material_normal.png',
+  'textures/Porsche_911GT3_2022InteriorA_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022InteriorA_Material_normal.png',
+  'textures/Porsche_911GT3_2022InteriorTillingA_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022InteriorTillingA_Material_normal.png',
+  'textures/Porsche_911GT3_2022LightA_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022ManufacturerPlateA_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022_CallipersCalliperA_Zone_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022_Wheel1A_3D_3DWheel1A_Material_baseColor.png',
+  'textures/Porsche_911GT3_2022_Wheel1A_3D_3DWheel1A_Material_normal.png',
+]);
+const TEX_SENTINEL = '__porsche_tex__';
 
 export const PorscheViewer = () => {
   const ref = useRef<CanvasRef>(null);
@@ -142,42 +149,54 @@ export const PorscheViewer = () => {
           }
         });
 
-        // Pre-fetch everything before touching GLTFLoader
-        const [gltfText, binBuf] = await Promise.all([
-          fetch(Image.resolveAssetSource(GLTF_ASSET).uri).then(r => r.text()),
-          fetch(Image.resolveAssetSource(BIN_ASSET).uri).then(r => r.arrayBuffer()),
-        ]);
+        // Read bundle assets via react-native-nitro-file-system (JSI, zero-copy)
+        const gltfText = readAssetText('porsche/scene.gltf');
+        const binBuf = readAssetBuf('porsche/scene_geometry.bin');
         if (stopped) return;
 
-        // Patch GLTF JSON: texture URIs → Metro absolute, bin → base64 data URI
         const gltfJson = JSON.parse(gltfText);
         for (const img of gltfJson.images ?? []) {
-          if (img.uri && TEX_URIS[img.uri])
-            img.uri = Image.resolveAssetSource(TEX_URIS[img.uri]).uri;
+          if (img.uri && TEX_FILES.has(img.uri)) img.uri = TEX_SENTINEL + img.uri;
         }
-        // Embed bin as base64 so loader.parse doesn't need a network fetch
-        const bytes = new Uint8Array(binBuf);
-        let b64 = '';
-        for (let i = 0; i < bytes.length; i += 0x8000) {
-          b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 0x8000)));
-        }
+        const BIN_SENTINEL = '__porsche_bin__';
         for (const buf of gltfJson.buffers ?? []) {
-          if (buf.uri?.endsWith('.bin'))
-            buf.uri = 'data:application/octet-stream;base64,' + b64;
+          if (buf.uri?.endsWith('.bin')) buf.uri = BIN_SENTINEL;
         }
 
-        // Patch ImageBitmapLoader: RN-WGPU createImageBitmap only accepts ArrayBuffer, not Blob
+        // Patch ImageBitmapLoader: serve textures from bundle via RNBU,
+        // and create ImageBitmap from ArrayBuffer (RN-WGPU only accepts ArrayBuffer)
         const IBL = (THREE as any).ImageBitmapLoader;
         const origIBLLoad = IBL.prototype.load;
         IBL.prototype.load = function(url: string, onLoad: any, _: any, onError: any) {
+          const i = typeof url === 'string' ? url.indexOf(TEX_SENTINEL) : -1;
+          if (i >= 0) {
+            const rel = url.slice(i + TEX_SENTINEL.length);
+            try {
+              const buf = readAssetBuf('porsche/' + rel);
+              createImageBitmap(buf as any).then(onLoad).catch(onError);
+            } catch (e) { onError && onError(e); }
+            return null;
+          }
           fetch(url).then(r => r.arrayBuffer()).then(buf => createImageBitmap(buf as any)).then(onLoad).catch(onError);
           return null;
+        };
+
+        // GLTFLoader uses THREE.FileLoader (XHR) — intercept sentinel for .bin
+        const FL = (THREE as any).FileLoader;
+        const origFLLoad = FL.prototype.load;
+        FL.prototype.load = function(url: string, onLoad: any, onProgress: any, onError: any) {
+          if (typeof url === 'string' && url.endsWith(BIN_SENTINEL)) {
+            setTimeout(() => onLoad && onLoad(binBuf), 0);
+            return;
+          }
+          return origFLLoad.call(this, url, onLoad, onProgress, onError);
         };
 
         const loader = new GLTFLoader();
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.parse(JSON.stringify(gltfJson), '', resolve, reject);
         });
+        FL.prototype.load = origFLLoad;
         IBL.prototype.load = origIBLLoad;
 
         if (stopped) return;

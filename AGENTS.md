@@ -523,6 +523,49 @@ Khai báo trong `package.json` hoặc `metro.config.js` để resolve đúng pla
 
 ---
 
+## 13b. Đọc binary asset từ APK bundle (GLTF/BIN/PNG) — đã verified
+
+### Vấn đề
+GLTF model lớn (Porsche 911 GT3: ~10MB `.bin` + 27 PNG textures + `.gltf` JSON) cần đọc raw bytes từ APK. RN tiêu chuẩn:
+- `require('.../file.bin')` + `fetch(Image.resolveAssetSource(...).uri)` chỉ chạy trong **debug** (Metro serve qua HTTP).
+- **Release crash với `Network request failed`** vì `fetch` của RN không hỗ trợ `asset:///android_asset/...` URI cho binary.
+
+### Cách đúng: `react-native-nitro-file-system` (JSI, zero-copy)
+- Package: `react-native-nitro-file-system` + peer `react-native-nitro-modules` + `react-native-nitro-buffer`
+- Hỗ trợ scheme `asset://` chung cho Android (AssetManager) và iOS (Main Bundle), zero-copy ArrayBuffer qua JSI — **không qua base64**.
+- API là callback-style → dùng `fs.readFileSync` hoặc `fs.promises.readFile`. KHÔNG `await fs.readFile(...)` trực tiếp (return void).
+
+```ts
+import fs from 'react-native-nitro-file-system';
+
+const buf = fs.readFileSync('asset://porsche/scene_geometry.bin') as any;
+const arrayBuf: ArrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+const text = fs.readFileSync('asset://porsche/scene.gltf', 'utf8') as string;
+```
+
+### Đặt file ở đâu
+Copy assets vào `android/app/src/main/assets/<your-dir>/` để bundle vào APK. Cho iOS, thêm vào Xcode bundle resources hoặc cấu hình `react-native.config.js`.
+
+### Pattern GLTF: bypass fetch trong GLTFLoader
+Three.js `GLTFLoader` gọi `THREE.FileLoader` (XHR) cho `.bin` + `THREE.ImageBitmapLoader` cho textures — cả hai cần fetch. Cách bypass:
+
+1. Parse `gltf` JSON ngoài loader, rewrite URI `.bin` và texture sang sentinel string (`__porsche_bin__`, `__porsche_tex__<rel>`).
+2. Monkey-patch `FileLoader.prototype.load` để khi gặp sentinel `.bin` thì trả `binBuf` đã đọc.
+3. Monkey-patch `ImageBitmapLoader.prototype.load` để khi gặp sentinel texture thì `readAssetBuf(rel)` → `createImageBitmap(arrayBuffer)`.
+4. Gọi `loader.parse(JSON.stringify(patchedJson), '', resolve, reject)`.
+5. Restore prototype patches sau khi xong.
+
+### Tại sao KHÔNG dùng `react-native-blob-util` / `react-native-fs`
+- Cả hai dùng bridge cũ → trả base64 string → JS phải `atob` decode → tốn RAM + CPU.
+- File 10MB bin → 13MB base64 string + `JSON.stringify` để embed `data:` URI → **OOM crash** trên emulator.
+- Trên New Arch (RN 0.85+) đã có JSI — không cần chịu overhead này.
+
+### Tại sao KHÔNG embed `.bin` thành `data:base64` URI trong gltf JSON
+- 10MB bin → 13MB base64 → khi gọi `JSON.stringify(gltfJson)` tạo thêm copy → 73MB allocation → OOM.
+- Ngoài ra RN `XMLHttpRequest` (mà `FileLoader` dùng) không hỗ trợ `data:` URI → vẫn fail dù có RAM.
+
+---
+
 ## 14. References
 
 - `react-native-wgpu`: https://github.com/wcandillon/react-native-webgpu

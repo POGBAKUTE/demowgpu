@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { VSMShadowMap } from 'three';
 import type { CanvasRef } from 'react-native-wgpu';
 import { Canvas } from 'react-native-wgpu';
-import { View, Text } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 
 import { makeWebGPURenderer } from '../three-helpers/makeWebGPURenderer';
@@ -10,6 +10,7 @@ import { makeWebGPURenderer } from '../three-helpers/makeWebGPURenderer';
 export const ThreeWGPUBoxClone = () => {
   const ref = useRef<CanvasRef>(null);
   const [err, setErr] = useState('');
+  const [fps, setFps] = useState(0);
 
   useEffect(() => {
     let stopped = false;
@@ -74,12 +75,22 @@ export const ThreeWGPUBoxClone = () => {
             box.rotation.y = time / 950;
             renderer.render(scene, camera);
             (context as any).present();
+            const now = performance.now();
+            frameCount++;
+            if (now - lastFpsTime >= 500) {
+              setFps(Math.round(frameCount * 1000 / (now - lastFpsTime)));
+              frameCount = 0;
+              lastFpsTime = now;
+            }
           } catch (e: any) {
             console.error('[BOX] animate error:', e?.message, e?.stack);
             setErr('animate: ' + e?.message);
             renderer.setAnimationLoop(null);
           }
         }
+
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
 
         renderer.setAnimationLoop(animate);
       } catch (e: any) {
@@ -94,6 +105,9 @@ export const ThreeWGPUBoxClone = () => {
   return (
     <View style={{ flex: 1 }}>
       <Canvas ref={ref} style={{ flex: 1 }} />
+      <View style={s.fpsWrap} pointerEvents="none">
+        <Text style={s.fpsText}>{fps} FPS</Text>
+      </View>
       {err ? (
         <View style={{ position: 'absolute', bottom: 60, left: 10, right: 10, backgroundColor: 'rgba(255,0,0,0.8)', padding: 8, borderRadius: 8 }}>
           <Text style={{ color: '#fff', fontSize: 11 }}>{err}</Text>
@@ -102,3 +116,8 @@ export const ThreeWGPUBoxClone = () => {
     </View>
   );
 };
+
+const s = StyleSheet.create({
+  fpsWrap: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  fpsText: { color: '#0f0', fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
+});

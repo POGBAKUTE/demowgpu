@@ -12,6 +12,7 @@ const MICHELLE_URL =
 export const MichelleViewer = () => {
   const ref = useRef<CanvasRef>(null);
   const [status, setStatus] = useState('Loading...');
+  const [fps, setFps] = useState(0);
 
   useEffect(() => {
     let stopped = false;
@@ -90,12 +91,13 @@ export const MichelleViewer = () => {
 
         const clock = new THREE.Clock();
         let angle = 0;
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
 
         renderer.setAnimationLoop(() => {
           const delta = clock.getDelta();
           mixer.update(delta);
 
-          // Slowly orbit camera around character
           angle += delta * 0.3;
           camera.position.x = Math.sin(angle) * 3.5;
           camera.position.z = Math.cos(angle) * 3.5;
@@ -103,6 +105,14 @@ export const MichelleViewer = () => {
 
           renderer.render(scene, camera);
           (context as any).present();
+
+          const now = performance.now();
+          frameCount++;
+          if (now - lastFpsTime >= 500) {
+            setFps(Math.round(frameCount * 1000 / (now - lastFpsTime)));
+            frameCount = 0;
+            lastFpsTime = now;
+          }
         });
       } catch (e: any) {
         console.error('[Michelle]', e?.message, e?.stack);
@@ -116,6 +126,9 @@ export const MichelleViewer = () => {
   return (
     <View style={s.root}>
       <Canvas ref={ref} style={StyleSheet.absoluteFill} />
+      <View style={s.fpsWrap} pointerEvents="none">
+        <Text style={s.fpsText}>{fps} FPS</Text>
+      </View>
       {status ? (
         <View style={s.statusWrap} pointerEvents="none">
           <Text style={s.statusText}>{status}</Text>
@@ -129,4 +142,6 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0d1117' },
   statusWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   statusText: { color: '#8b949e', fontSize: 14 },
+  fpsWrap: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  fpsText: { color: '#0f0', fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
 });
