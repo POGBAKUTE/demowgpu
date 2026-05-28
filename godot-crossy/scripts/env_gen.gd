@@ -107,10 +107,10 @@ func _populate_road(row: Row) -> void:
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(2.5, 5.5)
-	# All cars in a row use same variant (looks nicer)
-	var variant: Dictionary = VEHICLE_VARIANTS[randi() % VEHICLE_VARIANTS.size()]
 	var spacing := (Row.ROW_WIDTH - 2) / float(count)
 	for i in count:
+		# Random variant per car
+		var variant: Dictionary = VEHICLE_VARIANTS[randi() % VEHICLE_VARIANTS.size()]
 		var v: Vehicle = VEHICLE_SCENE.instantiate()
 		v.set_variant(variant.mesh, variant.tex)
 		v.setup(speed, dir, 0.0)
@@ -123,8 +123,8 @@ func _populate_river(row: Row) -> void:
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(1.5, 3.5)
-	var variant: Dictionary = LOG_VARIANTS[randi() % LOG_VARIANTS.size()]
 	for i in count:
+		var variant: Dictionary = LOG_VARIANTS[randi() % LOG_VARIANTS.size()]
 		var lg: LogObj = LOG_SCENE.instantiate()
 		lg.set_variant(variant.mesh, variant.tex)
 		lg.setup(speed, dir, 0.0, 2)

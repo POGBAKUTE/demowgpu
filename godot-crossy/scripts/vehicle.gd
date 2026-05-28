@@ -20,8 +20,13 @@ func setup(_speed: float, _dir: int, _z: float) -> void:
 	direction = _dir
 	lane_z = _z
 	position.z = _z
-	if direction < 0:
-		($Visual as Node3D).rotation.y = PI
+	# Car OBJ's long axis is Z (front faces +Z). Movement is along X,
+	# so rotate 90° so front aligns with direction of travel.
+	var v: Node3D = $Visual
+	if direction > 0:
+		v.rotation.y = -PI * 0.5  # face +X
+	else:
+		v.rotation.y = PI * 0.5   # face -X
 
 func _process(delta: float) -> void:
 	position.x += speed * direction * delta

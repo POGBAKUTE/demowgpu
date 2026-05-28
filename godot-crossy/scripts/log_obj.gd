@@ -22,8 +22,9 @@ func setup(_speed: float, _dir: int, _z: float, _width: int = 2) -> void:
 	lane_z = _z
 	log_width = _width
 	position.z = _z
-	if direction < 0:
-		($Visual as Node3D).rotation.y = PI
+	# Log's long axis is Z by default. Align with X movement.
+	var v: Node3D = $Visual
+	v.rotation.y = PI * 0.5
 
 func _process(delta: float) -> void:
 	position.x += speed * direction * delta
