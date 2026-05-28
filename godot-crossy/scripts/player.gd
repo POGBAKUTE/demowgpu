@@ -20,6 +20,14 @@ var can_move_to: Callable = func(_pos: Vector3i) -> bool: return true
 func _ready() -> void:
 	position = Vector3(grid_pos)
 
+func set_character(mesh: Mesh, tex: Texture2D) -> void:
+	var mi: MeshInstance3D = get_node("Visual/Mesh")
+	mi.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mi.material_override = mat
+
 func _unhandled_input(event: InputEvent) -> void:
 	if dead or is_hopping:
 		return

@@ -4,6 +4,23 @@ class_name EnvGen
 const VEHICLE_SCENE = preload("res://scenes/Vehicle.tscn")
 const LOG_SCENE = preload("res://scenes/Log.tscn")
 
+const VEHICLE_VARIANTS: Array = [
+	{"mesh": preload("res://assets/models/vehicles/blue_car/0.obj"), "tex": preload("res://assets/models/vehicles/blue_car/0.png"), "truck": false},
+	{"mesh": preload("res://assets/models/vehicles/green_car/0.obj"), "tex": preload("res://assets/models/vehicles/green_car/0.png"), "truck": false},
+	{"mesh": preload("res://assets/models/vehicles/orange_car/0.obj"), "tex": preload("res://assets/models/vehicles/orange_car/0.png"), "truck": false},
+	{"mesh": preload("res://assets/models/vehicles/purple_car/0.obj"), "tex": preload("res://assets/models/vehicles/purple_car/0.png"), "truck": false},
+	{"mesh": preload("res://assets/models/vehicles/taxi/0.obj"), "tex": preload("res://assets/models/vehicles/taxi/0.png"), "truck": false},
+	{"mesh": preload("res://assets/models/vehicles/blue_truck/0.obj"), "tex": preload("res://assets/models/vehicles/blue_truck/0.png"), "truck": true},
+	{"mesh": preload("res://assets/models/vehicles/red_truck/0.obj"), "tex": preload("res://assets/models/vehicles/red_truck/0.png"), "truck": true},
+]
+
+const LOG_VARIANTS: Array = [
+	{"mesh": preload("res://assets/models/environment/log/0/0.obj"), "tex": preload("res://assets/models/environment/log/0/0.png")},
+	{"mesh": preload("res://assets/models/environment/log/1/0.obj"), "tex": preload("res://assets/models/environment/log/1/0.png")},
+	{"mesh": preload("res://assets/models/environment/log/2/0.obj"), "tex": preload("res://assets/models/environment/log/2/0.png")},
+	{"mesh": preload("res://assets/models/environment/log/3/0.obj"), "tex": preload("res://assets/models/environment/log/3/0.png")},
+]
+
 const TREE_MESHES: Array = [
 	preload("res://assets/models/environment/tree/0/0.obj"),
 	preload("res://assets/models/environment/tree/1/0.obj"),
@@ -90,10 +107,12 @@ func _populate_road(row: Row) -> void:
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(2.5, 5.5)
-	# Spread cars out evenly so they don't overlap & avoid x near 0
+	# All cars in a row use same variant (looks nicer)
+	var variant: Dictionary = VEHICLE_VARIANTS[randi() % VEHICLE_VARIANTS.size()]
 	var spacing := (Row.ROW_WIDTH - 2) / float(count)
 	for i in count:
-		var v: Node3D = VEHICLE_SCENE.instantiate()
+		var v: Vehicle = VEHICLE_SCENE.instantiate()
+		v.set_variant(variant.mesh, variant.tex)
 		v.setup(speed, dir, 0.0)
 		v.position.x = -Row.ROW_HALF + 1 + i * spacing + randf_range(-1, 1)
 		row.add_child(v)
@@ -104,8 +123,10 @@ func _populate_river(row: Row) -> void:
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(1.5, 3.5)
+	var variant: Dictionary = LOG_VARIANTS[randi() % LOG_VARIANTS.size()]
 	for i in count:
-		var lg: Node3D = LOG_SCENE.instantiate()
+		var lg: LogObj = LOG_SCENE.instantiate()
+		lg.set_variant(variant.mesh, variant.tex)
 		lg.setup(speed, dir, 0.0, 2)
 		lg.position.x = float(randi_range(-Row.ROW_HALF + 2, Row.ROW_HALF - 2))
 		row.add_child(lg)

@@ -6,6 +6,7 @@ extends Node3D
 @onready var hud: HUD = $HUD
 @onready var audio: AudioManager = $AudioManager
 @onready var score_mgr: ScoreManager = $ScoreManager
+@onready var char_picker: CharacterPicker = $CharacterPicker
 
 const CAMERA_OFFSET := Vector3(0, 8, -10)
 
@@ -15,7 +16,17 @@ func _ready() -> void:
 	player.moved.connect(_on_player_moved)
 	player.died.connect(_on_player_died)
 	player.can_move_to = _can_move_to
+	char_picker.character_changed.connect(_on_character_changed)
 	_update_camera(true)
+
+func _on_character_changed(mesh: Mesh, tex: Texture2D, char_name: String) -> void:
+	player.set_character(mesh, tex)
+	hud.set_character_name(char_name)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_C:
+			char_picker.cycle_next()
 
 func _on_player_moved(pos: Vector3i) -> void:
 	env_gen.update_player_z(pos.z)

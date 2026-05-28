@@ -16,6 +16,10 @@ func _ready() -> void:
 func update_score(s: int) -> void:
 	score_label.text = str(s)
 
+func set_character_name(n: String) -> void:
+	if has_node("CharName"):
+		($CharName as Label).text = n + "  (press C)"
+
 func show_game_over(score: int, best: int) -> void:
 	score_line.text = "Score: %d" % score
 	best_line.text = "Best: %d" % best
