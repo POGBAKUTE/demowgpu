@@ -16,4 +16,4 @@ script = ExtResource("1_player")
 [node name="Mesh" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
 mesh = ExtResource("2_mesh")
-surface_material_override/0 = SubResource("StandardMaterial3D_chicken")
+material_override = SubResource("StandardMaterial3D_chicken")

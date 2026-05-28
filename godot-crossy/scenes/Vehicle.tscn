@@ -12,8 +12,8 @@ texture_filter = 0
 script = ExtResource("1_vehicle")
 
 [node name="Visual" type="Node3D" parent="."]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, 0, 0)
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 0, 0, 0)
 
 [node name="Mesh" type="MeshInstance3D" parent="Visual"]
 mesh = ExtResource("2_mesh")
-surface_material_override/0 = SubResource("StandardMaterial3D_car")
+material_override = SubResource("StandardMaterial3D_car")

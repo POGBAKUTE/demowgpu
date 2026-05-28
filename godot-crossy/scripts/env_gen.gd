@@ -55,8 +55,8 @@ func _cleanup_old_rows() -> void:
 
 func _spawn_row(z: int) -> void:
 	var kind: Row.Kind
-	if z <= 0:
-		kind = Row.Kind.GRASS
+	if z <= 1:
+		kind = Row.Kind.GRASS  # Safe starting zone
 	else:
 		var roll := randi() % 10
 		if roll < 4:
@@ -90,10 +90,12 @@ func _populate_road(row: Row) -> void:
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(2.5, 5.5)
+	# Spread cars out evenly so they don't overlap & avoid x near 0
+	var spacing := (Row.ROW_WIDTH - 2) / float(count)
 	for i in count:
 		var v: Node3D = VEHICLE_SCENE.instantiate()
 		v.setup(speed, dir, 0.0)
-		v.position.x = float(randi_range(-Row.ROW_HALF, Row.ROW_HALF))
+		v.position.x = -Row.ROW_HALF + 1 + i * spacing + randf_range(-1, 1)
 		row.add_child(v)
 		row.movers.append(v)
 
@@ -127,7 +129,7 @@ func _add_mesh_tile(row: Row, mesh: Mesh, tex: Texture2D, fallback: Color) -> vo
 		var mat := StandardMaterial3D.new()
 		mat.albedo_texture = tex
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		mi.set_surface_override_material(0, mat)
+		mi.material_override = mat
 	else:
 		var pm := PlaneMesh.new()
 		pm.size = Vector2(Row.ROW_WIDTH, 1.0)
@@ -146,7 +148,7 @@ func _place_tree(row: Row, x: int) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = TREE_TEXS[v]
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	mi.set_surface_override_material(0, mat)
+	mi.material_override = mat
 	mi.position = Vector3(x, 0.0, 0.0)
 	mi.scale = Vector3(0.4, 0.4, 0.4)
 	row.add_child(mi)
