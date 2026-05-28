@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/character_picker.gd" id="7_char"]
 
 [node name="Main" type="Node3D"]
+process_mode = 3
 script = ExtResource("1_game")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]

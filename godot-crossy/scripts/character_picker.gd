@@ -23,6 +23,10 @@ func cycle_next() -> void:
 	current_index = (current_index + 1) % CHARACTERS.size()
 	_emit_current()
 
+func cycle_prev() -> void:
+	current_index = (current_index - 1 + CHARACTERS.size()) % CHARACTERS.size()
+	_emit_current()
+
 func get_current() -> Dictionary:
 	return CHARACTERS[current_index]
 

@@ -10,14 +10,25 @@ extends Node3D
 
 const CAMERA_OFFSET := Vector3(0, 8, -10)
 
+var started: bool = false
+
 func _ready() -> void:
 	score_mgr.score_changed.connect(hud.update_score)
 	hud.restart_pressed.connect(_restart)
+	hud.char_prev_pressed.connect(char_picker.cycle_prev)
+	hud.char_next_pressed.connect(char_picker.cycle_next)
+	hud.start_pressed.connect(_start_game)
 	player.moved.connect(_on_player_moved)
 	player.died.connect(_on_player_died)
 	player.can_move_to = _can_move_to
 	char_picker.character_changed.connect(_on_character_changed)
+	get_tree().paused = true
 	_update_camera(true)
+
+func _start_game() -> void:
+	hud.hide_char_select()
+	get_tree().paused = false
+	started = true
 
 func _on_character_changed(mesh: Mesh, tex: Texture2D, char_name: String) -> void:
 	player.set_character(mesh, tex)

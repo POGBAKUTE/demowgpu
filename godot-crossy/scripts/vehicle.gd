@@ -24,9 +24,9 @@ func setup(_speed: float, _dir: int, _z: float) -> void:
 	# so rotate 90° so front aligns with direction of travel.
 	var v: Node3D = $Visual
 	if direction > 0:
-		v.rotation.y = -PI * 0.5  # face +X
+		v.rotation.y = PI * 0.5   # face +X
 	else:
-		v.rotation.y = PI * 0.5   # face -X
+		v.rotation.y = -PI * 0.5  # face -X
 
 func _process(delta: float) -> void:
 	position.x += speed * direction * delta
