@@ -124,10 +124,7 @@ func _populate_road(row: Row) -> void:
 		row.movers.append(v)
 
 func _populate_river(row: Row) -> void:
-	_add_flat_tile(row, Color(0.18, 0.52, 0.92), -0.2)
-	# Bank edges: small green strips at edges of river tile
-	_add_bank_edge(row, -0.45)
-	_add_bank_edge(row, 0.45)
+	_add_flat_tile(row, Color(0.22, 0.78, 0.88))
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(1.5, 3.5)
@@ -137,7 +134,7 @@ func _populate_river(row: Row) -> void:
 		lg.set_variant(variant.mesh, variant.tex)
 		lg.setup(speed, dir, 0.0, 2)
 		lg.position.x = float(randi_range(-Row.ROW_HALF + 2, Row.ROW_HALF - 2))
-		lg.position.y = 0.0
+		lg.position.y = 0.05
 		row.add_child(lg)
 		row.movers.append(lg)
 
@@ -184,16 +181,6 @@ func _place_tree(row: Row, x: int) -> void:
 	mi.scale = Vector3(0.55, 0.55, 0.55)
 	row.add_child(mi)
 
-func _add_bank_edge(row: Row, z_offset: float) -> void:
-	var mi := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
-	pm.size = Vector2(Row.ROW_WIDTH, 0.12)
-	mi.mesh = pm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.3, 0.6, 0.25)
-	mi.set_surface_override_material(0, mat)
-	mi.position = Vector3(0, -0.05, z_offset)
-	row.add_child(mi)
 
 func get_row(z: int) -> Row:
 	return _rows.get(z, null)
