@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3 uid="uid://main_scene"]
+[gd_scene load_steps=7 format=3 uid="uid://main_scene"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scripts/env_gen.gd" id="3_envgen"]
+[ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="4_hud"]
+[ext_resource type="Script" path="res://scripts/audio_manager.gd" id="5_audio"]
+[ext_resource type="Script" path="res://scripts/score_manager.gd" id="6_score"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_game")
@@ -22,3 +25,11 @@ light_energy = 1.5
 shadow_enabled = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="HUD" parent="." instance=ExtResource("4_hud")]
+
+[node name="AudioManager" type="Node" parent="."]
+script = ExtResource("5_audio")
+
+[node name="ScoreManager" type="Node" parent="."]
+script = ExtResource("6_score")

@@ -3,16 +3,44 @@ extends Node3D
 @onready var player: Player = $Player
 @onready var camera: Camera3D = $Camera3D
 @onready var env_gen: EnvGen = $EnvGen
+@onready var hud: HUD = $HUD
+@onready var audio: AudioManager = $AudioManager
+@onready var score_mgr: ScoreManager = $ScoreManager
 
 const CAMERA_OFFSET := Vector3(0, 8, -10)
-const PLAYER_MIN_X := -Row.ROW_HALF
-const PLAYER_MAX_X := Row.ROW_HALF
 
 func _ready() -> void:
-	print("[game] _ready, player=", player)
+	score_mgr.score_changed.connect(hud.update_score)
+	hud.restart_pressed.connect(_restart)
 	player.moved.connect(_on_player_moved)
 	player.died.connect(_on_player_died)
 	player.can_move_to = _can_move_to
+	_update_camera(true)
+
+func _on_player_moved(pos: Vector3i) -> void:
+	env_gen.update_player_z(pos.z)
+	score_mgr.set_score(pos.z)
+	audio.play_hop()
+	_check_row(pos)
+	_update_camera(false)
+
+func _on_player_died(cause: String) -> void:
+	audio.play_death(cause)
+	await get_tree().create_timer(0.6).timeout
+	hud.show_game_over(score_mgr.current_score, score_mgr.best_score)
+
+func _restart() -> void:
+	hud.hide_game_over()
+	score_mgr.reset()
+	# Reset env
+	for child in env_gen.get_children():
+		child.queue_free()
+	env_gen._rows.clear()
+	env_gen._next_z = 0
+	env_gen._player_z = 0
+	env_gen._ready()
+	# Reset player
+	player.reset_to(Vector3i.ZERO)
 	_update_camera(true)
 
 func _can_move_to(pos: Vector3i) -> bool:
@@ -23,30 +51,16 @@ func _can_move_to(pos: Vector3i) -> bool:
 		return false
 	return true
 
-func _on_player_moved(pos: Vector3i) -> void:
-	env_gen.update_player_z(pos.z)
-	_check_row(pos)
-	_update_camera(false)
-
-func _on_player_died(cause: String) -> void:
-	print("[game] player died: ", cause)
-
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_update_camera(false)
 	if not player.dead:
-		_check_river_carry(delta)
+		_check_river_carry(_delta)
 		_check_vehicle_hit()
 
 func _check_row(pos: Vector3i) -> void:
 	var row := env_gen.get_row(pos.z)
 	if row == null:
 		return
-	# Block movement into trees
-	if row.kind == Row.Kind.GRASS and row.is_blocked(pos.x):
-		# Revert — push player back (hop already moved them, so nudge back)
-		# We detect after the fact: just kill for now, better to pre-check
-		pass
-	# Fell in river with no log
 	if row.kind == Row.Kind.RIVER:
 		var on_log := _find_log_at(row, player.global_position.x)
 		if on_log == null:
@@ -58,7 +72,6 @@ func _check_river_carry(delta: float) -> void:
 		return
 	var lg := _find_log_at(row, player.global_position.x)
 	if lg != null:
-		# Carry player with log
 		player.position.x += lg.speed * lg.direction * delta
 		player.grid_pos.x = roundi(player.position.x)
 		if player.position.x < -Row.ROW_HALF - 1 or player.position.x > Row.ROW_HALF + 1:

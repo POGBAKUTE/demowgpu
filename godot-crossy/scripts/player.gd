@@ -13,7 +13,6 @@ var is_hopping := false
 var grid_pos := Vector3i.ZERO
 var dead := false
 
-# Injected by game.gd — returns true if the target cell is walkable
 var can_move_to: Callable = func(_pos: Vector3i) -> bool: return true
 
 @onready var visual: Node3D = $Visual
@@ -38,13 +37,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _try_hop(dir: Vector3i) -> void:
 	var target := grid_pos + dir
-	# Clamp horizontal
 	if target.x < GRID_MIN_X or target.x > GRID_MAX_X:
 		return
-	# Don't go backwards below start
 	if target.z < 0:
 		return
-	# Check passability (trees, walls)
 	if not can_move_to.call(target):
 		return
 	hop(dir)
@@ -53,8 +49,7 @@ func hop(dir: Vector3i) -> void:
 	is_hopping = true
 	var target := grid_pos + dir
 	if dir.x != 0 or dir.z != 0:
-		var dir_v := Vector3(dir)
-		visual.look_at(global_position + dir_v, Vector3.UP)
+		visual.look_at(global_position + Vector3(dir), Vector3.UP)
 
 	var target_v := Vector3(target)
 	var t := create_tween()
@@ -62,9 +57,16 @@ func hop(dir: Vector3i) -> void:
 	t.tween_property(self, "position:x", target_v.x, HOP_TIME)
 	t.tween_property(self, "position:z", target_v.z, HOP_TIME)
 
+	# Squash & stretch
 	var ty := create_tween()
-	ty.tween_property(self, "position:y", HOP_HEIGHT, HOP_TIME * 0.5)
-	ty.tween_property(self, "position:y", 0.0, HOP_TIME * 0.5)
+	ty.set_parallel(true)
+	ty.tween_property(visual, "scale", Vector3(0.8, 1.3, 0.8), HOP_TIME * 0.4)
+	ty.chain().tween_property(visual, "scale", Vector3(1.1, 0.85, 1.1), HOP_TIME * 0.3)
+	ty.chain().tween_property(visual, "scale", Vector3(1.0, 1.0, 1.0), HOP_TIME * 0.3)
+
+	var ty2 := create_tween()
+	ty2.tween_property(self, "position:y", HOP_HEIGHT, HOP_TIME * 0.5)
+	ty2.tween_property(self, "position:y", 0.0, HOP_TIME * 0.5)
 
 	await t.finished
 	grid_pos = target
@@ -75,4 +77,14 @@ func die(cause: String) -> void:
 	if dead:
 		return
 	dead = true
+	# Death squash
+	var t := create_tween()
+	t.tween_property(visual, "scale", Vector3(1.5, 0.1, 1.5), 0.2)
 	died.emit(cause)
+
+func reset_to(pos: Vector3i) -> void:
+	dead = false
+	is_hopping = false
+	grid_pos = pos
+	position = Vector3(pos)
+	visual.scale = Vector3.ONE
