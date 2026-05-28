@@ -120,7 +120,31 @@ async function loadModel(modelPath) {
 }
 ```
 
-### 4.3 Pattern load GLTF (có textures riêng — đã verified với Porsche 911 GT3)
+### 4.3 Pattern load GLTF — DÙNG `src/three-helpers/AssetManager.ts` (canonical, đã verified)
+
+Pattern hiện tại copy từ wcandillon official example (`vendor/react-native-webgpu/apps/example/src/ThreeJS/assets/AssetManager.ts`). Call site cực gọn:
+
+```ts
+import { useGLTF } from '../three-helpers/AssetManager';
+
+const gltf = useGLTF(require('../../assets/models/porsche/scene.gltf'));
+useEffect(() => {
+  if (!gltf) return;
+  // ... setup scene, add gltf.scene
+}, [gltf]);
+```
+
+**Cách hoạt động:**
+- `Image.resolveAssetSource(require(...))` → Metro URL (vd `http://localhost:8086/assets/.../scene.gltf`)
+- `GLTFLoader.load(url, cb)` → GLTFLoader tự fetch `.bin` + textures (relative URI) qua Metro
+- Metro serve mọi file có extension trong `metro.config.js` → `assetExts` (đã có `gltf, bin, hdr, png, jpg`)
+- Asset không cần `require()` riêng — chỉ cần đặt cạnh `.gltf`
+
+**1 patch duy nhất trong AssetManager.ts:** swap `ImageBitmapLoader.prototype.load` từ `blob()` sang `arrayBuffer()`. Nguyên nhân: **RN 0.85.3 + Hermes V1 + New Arch** đã đổi cách Blob expose qua JSI khiến `createImageBitmap(blob)` của `react-native-wgpu@0.5.11` fail (54 texture errors). Official example chạy ngon vì họ dùng **RN 0.81.4** — Blob path còn work. Đã verify: JS + native C++ của `react-native-wgpu` giữa hai project là identical. Đây là RN-version incompatibility, KHÔNG phải lib version.
+
+**Lưu ý:** Pattern này CHỈ chạy debug (Metro HTTP). Release build cần JSI/nitro-file-system (xem mục 13b cũ, hiện đã bỏ khỏi codebase — cần khôi phục nếu ship release).
+
+### 4.3-legacy Pattern cũ load GLTF (giữ làm reference, KHÔNG dùng nữa)
 
 **Root cause quan trọng:** Three.js WebGPU renderer dùng `ImageBitmapLoader` để load textures. `ImageBitmapLoader` gọi `fetch(url).then(r => r.blob()).then(blob => createImageBitmap(blob))` — nhưng `react-native-wgpu`'s `createImageBitmap` **chỉ nhận `ArrayBuffer`**, không nhận `Blob` → fail hoàn toàn.
 
@@ -246,7 +270,21 @@ Game medium (~1000 LOC): **1-2 ngày** với người đã quen RN + Three.
 
 ---
 
-## 8b. Pattern render ĐÚNG cho CrossyRoadGame (đã verified)
+## 8b. Pattern render — `await renderer.init()` đã OBSOLETE (2026-05-28)
+
+Trên RN 0.85.3 + `react-native-wgpu@0.5.11`, KHÔNG cần `await renderer.init()`. Three.js WebGPU renderer tự lazy-init khi `render()` lần đầu được gọi và đã chạy ổn. Pattern hiện tại (đã verified với Porsche + Michelle):
+
+```ts
+const renderer = makeWebGPURenderer(context as any);
+// KHÔNG cần await renderer.init() nữa
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.setAnimationLoop(() => {
+  renderer.render(scene, camera);
+  (context as any).present();
+});
+```
+
+(Phần dưới là ghi chú lịch sử thời `await init()` còn cần thiết — giữ làm reference.)
 
 ```ts
 // ✅ ĐÚNG — phải await init, dùng sync render
@@ -563,6 +601,115 @@ Three.js `GLTFLoader` gọi `THREE.FileLoader` (XHR) cho `.bin` + `THREE.ImageBi
 ### Tại sao KHÔNG embed `.bin` thành `data:base64` URI trong gltf JSON
 - 10MB bin → 13MB base64 → khi gọi `JSON.stringify(gltfJson)` tạo thêm copy → 73MB allocation → OOM.
 - Ngoài ra RN `XMLHttpRequest` (mà `FileLoader` dùng) không hỗ trợ `data:` URI → vẫn fail dù có RAM.
+
+---
+
+## 15. AssetManager.ts — canonical pattern (2026-05-28)
+
+`src/three-helpers/AssetManager.ts` là hook-based asset loader copy từ wcandillon official example, mở rộng để hỗ trợ release Android.
+
+```ts
+const gltf = useGLTF(require('./scene.gltf'), 'porsche/scene.gltf');
+const envMap = useRGBE(require('./env.hdr'), 'porsche/env.hdr');
+```
+
+**Cách hoạt động:**
+- `__DEV__` → Metro HTTP fetch (gọn nhẹ, hot reload đổi asset không cần rebuild native)
+- `!__DEV__` + có bundlePath → `react-native-nitro-file-system` đọc `asset://<bundlePath>` qua JSI, parse buffer trực tiếp (bypass fetch fail trên Android release)
+
+**Quy tắc đặt asset:**
+- Debug: bất cứ đâu trong `assets/` đã được `require()`-d
+- Release: copy vào `android/app/src/main/assets/<bundlePath>` (mirror path). iOS bundle resources phải add qua Xcode (chưa setup — iOS release sẽ fail).
+
+**Patches bên trong AssetManager:**
+1. `ImageBitmapLoader.prototype.load` swap blob→arrayBuffer — RN 0.85 + Hermes Blob path không tương thích với `react-native-wgpu@0.5.11` (đã verified ở mục 4.3).
+2. `getFs()` lazy require nitro-fs — iOS debug build chưa link native module vẫn import được module (chỉ fail khi gọi tới JSI).
+
+---
+
+## 16. Crossy Road loader (hybrid OBJ+PNG) — 2026-05-28
+
+Cùng pattern hybrid như AssetManager nhưng cho OBJ + PNG:
+- Debug: fetch Metro URL của `require()` handle
+- Release: nitro-fs `asset://crossy/<relative-path>`
+
+Asset path map có 2 phần:
+- `OBJ_MAP` — `require()` cho Metro bundling
+- `TEX_PATH_MAP` — string paths cho asset:// (parallel structure)
+
+`preloadAll(onProgress)` — load tất cả assets vào cache trước khi vào game; START button hiển thị "Loading X%" trong khi preload.
+
+Trên Android, copy `assets/models/**/*.{obj,png}` vào `android/app/src/main/assets/crossy/assets/models/`. 82 files, ~2MB.
+
+---
+
+## 17. InstancedMesh — trees Crossy (partial) — 2026-05-28
+
+`src/crossyroad/treeInstances.js` — pool manager:
+- 1 InstancedMesh per tree variant (tree0/1/2), capacity 256
+- `spawnTreeInstance(variant, x, y, z)` → instance id
+- `releaseTreeInstance(variant, id)` → mark slot free
+- Spawn matrix set once (trees static); release scales matrix to 0 (hide)
+
+Tích hợp trong `environement.js getNext()` grass branch + `removeOldBlocks()` trong CrossyRoadGame để release slots khi remove row.
+
+**Logs + cars CHƯA refactor** — `wood.position.z/x` reads trong collision logic (PositionOccupiedWood) cần Object3D proxy hoặc rewrite logic. Deferred.
+
+---
+
+## 18. HDR environment cho Porsche — limited (2026-05-28)
+
+- `useRGBE` hook nhận asset + bundlePath, parse buffer trong release
+- Scene.environment + scene.background dùng equirectangular HDR
+- Giảm directional lights vì IBL cung cấp ambient + reflections
+
+**Bug: PMREM compute crash/hang trên Android.** Three.js dùng PMREM (compute shader) để convert HDR → prefiltered cubemap mipmap. Trên Android Vulkan stack (cả emulator + một số real device) compute shader bị hang hoặc crash render thread.
+
+**Workaround hiện tại:** `HDR_ENABLED = Platform.OS === 'ios'`. iOS Metal handles PMREM OK; Android skip HDR, dùng directional lights.
+
+Tương lai: pre-bake PMREM offline (export cubemap mipmap chain), load như texture array → bypass runtime compute.
+
+---
+
+## 19. Performance findings — real Android device (mid-tier, 2026-05-28)
+
+Test trên Android thật (release APK):
+- **Crossy Road: 25 FPS**, Michelle viewer: 25 FPS
+- Porsche viewer: **crash** trên HDR (đã skip Android)
+
+**Root cause analysis — bottleneck là JS CPU (Hermes), KHÔNG phải GPU:**
+
+Mỗi frame Three.js làm trong JS:
+1. Scene graph traversal — update matrixWorld cho 200+ Object3D
+2. Frustum culling per Mesh
+3. Sort depth, build render lists
+4. Submit draw calls qua JSI
+
+Hermes là interpreter (no JIT) → matrix math + traversal **chậm 5-10× so với V8 Web**. Same Three.js scene chạy 60 FPS trên iPhone Safari nhưng chỉ 25-30 FPS trên RN-WGPU + Hermes cùng device. GPU không phải bottleneck.
+
+**Hướng optimize đã đề xuất (chưa apply):**
+
+Easy (low risk):
+- Shadow map 2048 → 1024 (+5-10 FPS)
+- MeshStandardMaterial → MeshLambertMaterial (+5-10 FPS)
+- Render @ 0.7× pixel ratio rồi upscale (+30-50 FPS, hơi mờ)
+- Tắt shadow hoàn toàn trên Android (+15-25 FPS)
+
+Medium:
+- InstancedMesh cho cars + logs (+5-15 FPS, risk collision regression)
+- Merge static row geometry vào 1 Mesh per row type (+10-20 FPS)
+
+Architecture-level:
+- Switch Hermes → JSC (JavaScriptCore) — JSC có JIT trên Android, có thể 2-3× JS perf. Toggle trong `android/gradle.properties`: `hermesEnabled=false`. **Chưa test**, đáng thử nhất.
+- Port game logic sang `react-native-worklets` chạy UI thread (rất phức tạp với Three.js)
+
+**Kết luận thực dụng:**
+RN-WGPU + Three.js + Hermes hiện không đủ perf cho 60 FPS mobile game. Phù hợp với:
+- 3D viewer / showcase (Porsche, Michelle pattern)
+- App có 1 màn 3D nhỏ
+- Prototype trước khi port sang Unity/Godot
+
+KHÔNG phù hợp: game 60 FPS full-screen production. Nếu ship game thật, nên dùng Unity / Godot / native Metal+Vulkan.
 
 ---
 

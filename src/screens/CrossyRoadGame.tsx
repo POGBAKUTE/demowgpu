@@ -24,9 +24,10 @@ import {
 
 import { makeWebGPURenderer } from '../three-helpers/makeWebGPURenderer';
 // @ts-ignore plain .js files
-import { loadModel } from '../crossyroad/loader.js';
+import { loadModel, preloadAll } from '../crossyroad/loader.js';
 // @ts-ignore
-import { getNext, woods, cars, isHitByCar, resetEnvironment } from '../crossyroad/environement.js';
+import { getNext, woods, cars, isHitByCar, resetEnvironment, releaseBlockInstances } from '../crossyroad/environement.js';
+import { getTreeMeshes, resetTreeInstances } from '../crossyroad/treeInstances.js';
 // @ts-ignore
 import { movePoulet, loose, moveCamera } from '../crossyroad/moove.js';
 // @ts-ignore
@@ -64,6 +65,8 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
   const [score, setScore] = useState(0);
   const [over, setOver] = useState(false);
   const [started, setStarted] = useState(false);
+  const [preloading, setPreloading] = useState(false);
+  const [loadPct, setLoadPct] = useState(0);
   const [characterPath, setCharacterPath] = useState(CHARACTERS[0].path);
   const [bestScore, setBestScore] = useState(0);
   const [userName, setUserNameState] = useState('');
@@ -119,8 +122,18 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
     rendererRef.current?.setAnimationLoop(animateRef.current);
   };
 
-  const beginGame = () => {
+  const beginGame = async () => {
     initAudio();
+    setPreloading(true);
+    setLoadPct(0);
+    try {
+      await preloadAll((loaded: number, total: number) => {
+        setLoadPct(Math.round((loaded / total) * 100));
+      });
+    } catch (e: any) {
+      console.error('[preload]', e?.message ?? e);
+    }
+    setPreloading(false);
     setStarted(true);
   };
 
@@ -161,8 +174,8 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
       const dir = new DirectionalLight(0xffffff, 1.5);
       dir.position.set(12, 20, -5);
       dir.castShadow = true;
-      dir.shadow.mapSize.width = 2048;
-      dir.shadow.mapSize.height = 2048;
+      dir.shadow.mapSize.width = 1024;
+      dir.shadow.mapSize.height = 1024;
       (dir.shadow as any).radius = 1; // VSMShadowMap blur radius — 1 = sharpest
       dir.shadow.camera.left = -20;
       dir.shadow.camera.right = 20;
@@ -185,6 +198,7 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
       log('renderer ready ' + width + 'x' + height);
 
       resetEnvironment();
+      resetTreeInstances();
       log('loading model: ' + characterPath);
       const chicken = await loadModel(characterPath);
       log('model loaded');
@@ -207,6 +221,10 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
       async function addEnvironmentBlock(i: number) {
         const block = await getNext(0, -0.4, i);
         if (block != null) scene.add(block);
+        // Add tree InstancedMeshes once they've been initialized (lazy on first grass row).
+        for (const m of getTreeMeshes()) {
+          if (!scene.children.includes(m)) scene.add(m);
+        }
       }
       for (let i = 0; i < 20; i++) {
         addEnvironmentBlock(i);
@@ -234,7 +252,6 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
           car.position.x += carSpeed;
           if (car.position.x > 10) car.position.x = -10;
           if (!scene.children.includes(car)) scene.add(car);
-          car.userData.box = new Box3().setFromObject(car);
         });
       }
       function removeOldBlocks(z: number) {
@@ -243,10 +260,12 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
             child.position.z < z - 10 &&
             child.type !== 'AmbientLight' &&
             child.type !== 'DirectionalLight' &&
+            !child.isInstancedMesh &&
             child !== chicken
           ) {
             const idx = whereBlocksRef.current.indexOf(child.position.z);
             if (idx >= 0) whereBlocksRef.current.splice(idx, 1);
+            releaseBlockInstances(child);
             scene.remove(child);
           }
         });
@@ -388,8 +407,8 @@ export const CrossyRoadGame = ({ navigation }: { navigation: any }) => {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={s.startBtn} onPress={beginGame}>
-              <Text style={s.startBtnText}>START</Text>
+            <TouchableOpacity style={s.startBtn} onPress={beginGame} disabled={preloading}>
+              <Text style={s.startBtnText}>{preloading ? `Loading ${loadPct}%` : 'START'}</Text>
             </TouchableOpacity>
             {errorMsg ? <Text style={s.errorText}>{errorMsg}</Text> : null}
             <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>

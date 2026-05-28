@@ -1,0 +1,32 @@
+name: Setup
+description: Setup Node.js and install dependencies
+
+inputs:
+  github_token:
+    description: 'GitHub Token'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version-file: .nvmrc
+
+    - name: Install dependencies
+      run: |
+        HASH_FILE="/tmp/.yarn-lock-hash"
+        CURRENT_HASH=$(shasum yarn.lock | cut -d' ' -f1)
+        if [ -f "$HASH_FILE" ] && [ "$(cat "$HASH_FILE")" = "$CURRENT_HASH" ] && [ -d "node_modules" ]; then
+          echo "yarn.lock unchanged and node_modules exists — skipping install"
+        else
+          yarn install --immutable
+          echo "$CURRENT_HASH" > "$HASH_FILE"
+        fi
+      shell: bash
+
+    - name: Install Dawn
+      working-directory: packages/webgpu
+      shell: bash
+      run: yarn install-dawn

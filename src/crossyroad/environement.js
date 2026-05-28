@@ -1,5 +1,6 @@
 import { loadModel } from './loader.js';
 import { LoadingManager } from 'three';
+import { initTreeInstances, spawnTreeInstance, releaseTreeInstance } from './treeInstances.js';
 
 const envs = {};
 const more = {};
@@ -135,25 +136,20 @@ export async function getNext(x, y, z) {
         if (node.isMesh) { node.receiveShadow = true; }
     });
     if (randomKey === 'grass') {
+        // Lazy-init InstancedMesh pools using cached tree models.
+        initTreeInstances({ tree0: more.tree0, tree1: more.tree1, tree2: more.tree2 });
         const treeCount = Math.floor(Math.random() * 5) + 1;
+        const spawned = [];
         for (let i = 0; i < treeCount; i++) {
             const treeKey = 'tree' + Math.floor(Math.random() * 3);
-            const tree = more[treeKey].clone();
-            tree.traverse((node) => {
-                if (node.isMesh) {
-                    node.castShadow = true;
-                    node.receiveShadow = true;
-                }
-            });
             const randomX = Math.floor(Math.random() * 16 - 8);
-            // Keep a 3-wide clear corridor at spawn rows so player isn't trapped
-            if ((z === 0 || z === 1) && Math.abs(randomX) <= 1) {
-                continue;
-            }
-            tree.position.set(randomX, 0.4, 0);
-            treePositions.push({ x: randomX, z: Math.floor(z) });
-            randomEnv.add(tree);
+            if ((z === 0 || z === 1) && Math.abs(randomX) <= 1) continue;
+            const worldZ = Math.floor(z);
+            const id = spawnTreeInstance(treeKey, x + randomX, 0.4 + y, worldZ);
+            if (id >= 0) spawned.push({ variant: treeKey, id });
+            treePositions.push({ x: randomX, z: worldZ });
         }
+        randomEnv.userData.treeInstances = spawned;
     }
     if (randomKey === 'river') {
         const woodCount = Math.floor(Math.random() * 4) + 1;
@@ -204,6 +200,14 @@ export async function getNext(x, y, z) {
     randomEnv.scale.set(1, 1, 1);
     blockPosition.push({ nature: randomKey, z: Math.floor(z) });
     return randomEnv;
+}
+
+export function releaseBlockInstances(block) {
+    const instances = block?.userData?.treeInstances;
+    if (instances) {
+        for (const { variant, id } of instances) releaseTreeInstance(variant, id);
+        block.userData.treeInstances = null;
+    }
 }
 
 export function resetEnvironment() {
