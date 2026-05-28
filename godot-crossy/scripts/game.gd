@@ -18,6 +18,7 @@ func _ready() -> void:
 	hud.char_prev_pressed.connect(char_picker.cycle_prev)
 	hud.char_next_pressed.connect(char_picker.cycle_next)
 	hud.start_pressed.connect(_start_game)
+	hud.hop_dir.connect(func(d: Vector3i): player.try_hop(d))
 	player.moved.connect(_on_player_moved)
 	player.died.connect(_on_player_died)
 	player.can_move_to = _can_move_to

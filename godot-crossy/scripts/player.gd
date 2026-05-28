@@ -43,6 +43,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if dir != Vector3i.ZERO:
 		_try_hop(dir)
 
+func try_hop(dir: Vector3i) -> void:
+	if dead or is_hopping:
+		return
+	_try_hop(dir)
+
 func _try_hop(dir: Vector3i) -> void:
 	var target := grid_pos + dir
 	if target.x < GRID_MIN_X or target.x > GRID_MAX_X:
@@ -56,8 +61,9 @@ func _try_hop(dir: Vector3i) -> void:
 func hop(dir: Vector3i) -> void:
 	is_hopping = true
 	var target := grid_pos + dir
-	if dir.x != 0 or dir.z != 0:
-		visual.look_at(global_position + Vector3(dir), Vector3.UP)
+	# OBJ characters have their "front" on +Z, so use atan2 directly
+	# (look_at would flip them 180° since look_at points -Z at target).
+	visual.rotation.y = atan2(float(dir.x), float(dir.z))
 
 	var target_v := Vector3(target)
 	var t := create_tween()

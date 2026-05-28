@@ -22,6 +22,66 @@ theme_override_constants/shadow_offset_y = 2
 text = "Chicken  (press C)"
 horizontal_alignment = 2
 
+[node name="FpsLabel" type="Label" parent="."]
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 200.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.5, 1, 0.5, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+text = "FPS: --"
+
+[node name="DPad" type="Control" parent="."]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -220.0
+offset_top = -220.0
+offset_right = -20.0
+offset_bottom = -20.0
+
+[node name="UpBtn" type="Button" parent="DPad"]
+custom_minimum_size = Vector2(60, 60)
+offset_left = 70.0
+offset_top = 0.0
+offset_right = 130.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 28
+text = "▲"
+
+[node name="DownBtn" type="Button" parent="DPad"]
+custom_minimum_size = Vector2(60, 60)
+offset_left = 70.0
+offset_top = 140.0
+offset_right = 130.0
+offset_bottom = 200.0
+theme_override_font_sizes/font_size = 28
+text = "▼"
+
+[node name="LeftBtn" type="Button" parent="DPad"]
+custom_minimum_size = Vector2(60, 60)
+offset_left = 0.0
+offset_top = 70.0
+offset_right = 60.0
+offset_bottom = 130.0
+theme_override_font_sizes/font_size = 28
+text = "◀"
+
+[node name="RightBtn" type="Button" parent="DPad"]
+custom_minimum_size = Vector2(60, 60)
+offset_left = 140.0
+offset_top = 70.0
+offset_right = 200.0
+offset_bottom = 130.0
+theme_override_font_sizes/font_size = 28
+text = "▶"
+
 [node name="ScoreLabel" type="Label" parent="."]
 anchors_preset = 5
 anchor_left = 0.5
