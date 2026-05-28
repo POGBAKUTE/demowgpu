@@ -42,6 +42,7 @@ const DESPAWN_BEHIND := 5
 var _rows: Dictionary = {}
 var _next_z: int = 0
 var _player_z: int = 0
+var _prev_kind: Row.Kind = Row.Kind.GRASS
 
 func _ready() -> void:
 	randomize()
@@ -82,7 +83,11 @@ func _spawn_row(z: int) -> void:
 			kind = Row.Kind.ROAD
 		else:
 			kind = Row.Kind.RIVER
+		# No consecutive river rows
+		if kind == Row.Kind.RIVER and _prev_kind == Row.Kind.RIVER:
+			kind = Row.Kind.GRASS
 
+	_prev_kind = kind
 	var row := Row.new()
 	row.setup(kind, z)
 	add_child(row)
@@ -103,7 +108,7 @@ func _populate_grass(row: Row) -> void:
 			_place_tree(row, x)
 
 func _populate_road(row: Row) -> void:
-	_add_mesh_tile(row, ROAD_MESH, ROAD_TEX, Color(0.3, 0.3, 0.3))
+	_add_flat_tile(row, Color(0.22, 0.22, 0.25))
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(2.5, 5.5)
@@ -119,7 +124,10 @@ func _populate_road(row: Row) -> void:
 		row.movers.append(v)
 
 func _populate_river(row: Row) -> void:
-	_add_mesh_tile(row, RIVER_MESH, RIVER_TEX, Color(0.2, 0.5, 0.9))
+	_add_flat_tile(row, Color(0.18, 0.52, 0.92), -0.2)
+	# Bank edges: small green strips at edges of river tile
+	_add_bank_edge(row, -0.45)
+	_add_bank_edge(row, 0.45)
 	var count := randi_range(1, 3)
 	var dir := 1 if randi() % 2 == 0 else -1
 	var speed := randf_range(1.5, 3.5)
@@ -129,22 +137,24 @@ func _populate_river(row: Row) -> void:
 		lg.set_variant(variant.mesh, variant.tex)
 		lg.setup(speed, dir, 0.0, 2)
 		lg.position.x = float(randi_range(-Row.ROW_HALF + 2, Row.ROW_HALF - 2))
+		lg.position.y = 0.0
 		row.add_child(lg)
 		row.movers.append(lg)
 
-func _add_flat_tile(row: Row, color: Color) -> void:
+func _add_flat_tile(row: Row, color: Color, y_offset: float = -0.01, size_z: float = 1.0) -> void:
 	var mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(Row.ROW_WIDTH, 1.0)
+	pm.size = Vector2(Row.ROW_WIDTH, size_z)
 	mi.mesh = pm
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mi.set_surface_override_material(0, mat)
-	mi.position = Vector3(0, -0.01, 0)
+	mi.position = Vector3(0, y_offset, 0)
 	row.add_child(mi)
 
 func _add_mesh_tile(row: Row, mesh: Mesh, tex: Texture2D, fallback: Color) -> void:
 	var mi := MeshInstance3D.new()
+	mi.position = Vector3(0, -0.5, 0)
 	if mesh != null:
 		mi.mesh = mesh
 		var mat := StandardMaterial3D.new()
@@ -171,7 +181,18 @@ func _place_tree(row: Row, x: int) -> void:
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	mi.material_override = mat
 	mi.position = Vector3(x, 0.0, 0.0)
-	mi.scale = Vector3(0.4, 0.4, 0.4)
+	mi.scale = Vector3(0.55, 0.55, 0.55)
+	row.add_child(mi)
+
+func _add_bank_edge(row: Row, z_offset: float) -> void:
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(Row.ROW_WIDTH, 0.12)
+	mi.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.3, 0.6, 0.25)
+	mi.set_surface_override_material(0, mat)
+	mi.position = Vector3(0, -0.05, z_offset)
 	row.add_child(mi)
 
 func get_row(z: int) -> Row:

@@ -15,6 +15,7 @@ var started: bool = false
 func _ready() -> void:
 	score_mgr.score_changed.connect(hud.update_score)
 	hud.restart_pressed.connect(_restart)
+	hud.home_pressed.connect(_go_home)
 	hud.char_prev_pressed.connect(char_picker.cycle_prev)
 	hud.char_next_pressed.connect(char_picker.cycle_next)
 	hud.start_pressed.connect(_start_game)
@@ -23,6 +24,8 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	player.can_move_to = _can_move_to
 	char_picker.character_changed.connect(_on_character_changed)
+	var c := char_picker.get_current()
+	_on_character_changed(c.mesh, c.tex, c.name)
 	get_tree().paused = true
 	_update_camera(true)
 
@@ -30,6 +33,23 @@ func _start_game() -> void:
 	hud.hide_char_select()
 	get_tree().paused = false
 	started = true
+
+func _go_home() -> void:
+	# Reset world + show char select
+	hud.hide_game_over()
+	for child in env_gen.get_children():
+		child.queue_free()
+	env_gen._rows.clear()
+	env_gen._next_z = 0
+	env_gen._player_z = 0
+	env_gen._prev_kind = Row.Kind.GRASS
+	score_mgr.reset()
+	player.reset_to(Vector3i.ZERO)
+	get_tree().paused = true
+	started = false
+	hud.show_char_select()
+	env_gen._ready()
+	_update_camera(true)
 
 func _on_character_changed(mesh: Mesh, tex: Texture2D, char_name: String) -> void:
 	player.set_character(mesh, tex)
@@ -39,6 +59,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_C:
 			char_picker.cycle_next()
+		elif not started and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER):
+			_start_game()
 
 func _on_player_moved(pos: Vector3i) -> void:
 	env_gen.update_player_z(pos.z)
@@ -61,6 +83,7 @@ func _restart() -> void:
 	env_gen._rows.clear()
 	env_gen._next_z = 0
 	env_gen._player_z = 0
+	env_gen._prev_kind = Row.Kind.GRASS
 	env_gen._ready()
 	# Reset player
 	player.reset_to(Vector3i.ZERO)

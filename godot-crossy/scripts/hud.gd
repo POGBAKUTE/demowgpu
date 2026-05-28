@@ -5,6 +5,7 @@ class_name HUD
 @onready var char_name_label: Label = $CharName
 @onready var fps_label: Label = $FpsLabel
 @onready var dpad: Control = $DPad
+@onready var top_right: HBoxContainer = $TopRight
 @onready var game_over: PanelContainer = $GameOver
 @onready var score_line: Label = $GameOver/VBox/ScoreLine
 @onready var best_line: Label = $GameOver/VBox/BestLine
@@ -16,25 +17,29 @@ class_name HUD
 @onready var start_btn: Button = $CharSelect/VBox/StartBtn
 
 signal restart_pressed
+signal home_pressed
 signal char_prev_pressed
 signal char_next_pressed
 signal start_pressed
 signal hop_dir(d: Vector3i)
 
 func _ready() -> void:
-	restart_btn.pressed.connect(func(): restart_pressed.emit())
-	prev_btn.pressed.connect(func(): char_prev_pressed.emit())
-	next_btn.pressed.connect(func(): char_next_pressed.emit())
-	start_btn.pressed.connect(func(): start_pressed.emit())
+	restart_btn.pressed.connect(func(): print("[hud] restart_btn pressed"); restart_pressed.emit())
+	($TopRight/HomeBtn as Button).pressed.connect(func(): print("[hud] home_btn pressed"); home_pressed.emit())
+	($TopRight/RestartBtn as Button).pressed.connect(func(): print("[hud] top_restart pressed"); restart_pressed.emit())
+	prev_btn.pressed.connect(func(): print("[hud] prev"); char_prev_pressed.emit())
+	next_btn.pressed.connect(func(): print("[hud] next"); char_next_pressed.emit())
+	start_btn.pressed.connect(func(): print("[hud] START PRESSED"); start_pressed.emit())
 	($DPad/UpBtn as Button).pressed.connect(func(): hop_dir.emit(Vector3i(0, 0, 1)))
 	($DPad/DownBtn as Button).pressed.connect(func(): hop_dir.emit(Vector3i(0, 0, -1)))
-	($DPad/LeftBtn as Button).pressed.connect(func(): hop_dir.emit(Vector3i(-1, 0, 0)))
-	($DPad/RightBtn as Button).pressed.connect(func(): hop_dir.emit(Vector3i(1, 0, 0)))
+	($DPad/LeftBtn as Button).pressed.connect(func(): hop_dir.emit(Vector3i(1, 0, 0)))
+	($DPad/RightBtn as Button).pressed.connect(func(): hop_dir.emit(Vector3i(-1, 0, 0)))
 	game_over.visible = false
 	char_select.visible = true
 	score_label.visible = false
 	char_name_label.visible = false
 	dpad.visible = false
+	top_right.visible = false
 
 func _process(_delta: float) -> void:
 	fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
@@ -60,9 +65,11 @@ func show_char_select() -> void:
 	score_label.visible = false
 	char_name_label.visible = false
 	dpad.visible = false
+	top_right.visible = false
 
 func hide_char_select() -> void:
 	char_select.visible = false
 	score_label.visible = true
 	char_name_label.visible = true
 	dpad.visible = true
+	top_right.visible = true

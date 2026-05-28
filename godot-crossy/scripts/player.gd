@@ -27,6 +27,10 @@ func set_character(mesh: Mesh, tex: Texture2D) -> void:
 	mat.albedo_texture = tex
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	mi.material_override = mat
+	# Auto-ground: move visual so bottom of mesh is at y=0
+	var aabb := mesh.get_aabb()
+	var scale_y := mi.transform.basis.y.length()
+	visual.position.y = -(aabb.position.y * scale_y)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if dead or is_hopping:
@@ -37,9 +41,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_down"):
 		dir = Vector3i(0, 0, -1)
 	elif event.is_action_pressed("move_left"):
-		dir = Vector3i(-1, 0, 0)
-	elif event.is_action_pressed("move_right"):
 		dir = Vector3i(1, 0, 0)
+	elif event.is_action_pressed("move_right"):
+		dir = Vector3i(-1, 0, 0)
 	if dir != Vector3i.ZERO:
 		_try_hop(dir)
 

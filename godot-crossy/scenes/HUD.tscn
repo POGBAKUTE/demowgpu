@@ -22,6 +22,25 @@ theme_override_constants/shadow_offset_y = 2
 text = "Chicken  (press C)"
 horizontal_alignment = 2
 
+[node name="TopRight" type="HBoxContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -180.0
+offset_top = 60.0
+offset_right = -20.0
+offset_bottom = 100.0
+
+[node name="HomeBtn" type="Button" parent="TopRight"]
+custom_minimum_size = Vector2(70, 36)
+theme_override_font_sizes/font_size = 18
+text = "🏠 Home"
+
+[node name="RestartBtn" type="Button" parent="TopRight"]
+custom_minimum_size = Vector2(70, 36)
+theme_override_font_sizes/font_size = 18
+text = "↻ Restart"
+
 [node name="FpsLabel" type="Label" parent="."]
 anchors_preset = 0
 offset_left = 20.0
@@ -36,14 +55,14 @@ theme_override_constants/shadow_offset_y = 1
 text = "FPS: --"
 
 [node name="DPad" type="Control" parent="."]
-anchors_preset = 3
-anchor_left = 1.0
+anchors_preset = 7
+anchor_left = 0.5
 anchor_top = 1.0
-anchor_right = 1.0
+anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -220.0
+offset_left = -100.0
 offset_top = -220.0
-offset_right = -20.0
+offset_right = 100.0
 offset_bottom = -20.0
 
 [node name="UpBtn" type="Button" parent="DPad"]
@@ -106,6 +125,7 @@ anchor_bottom = 1.0
 
 [node name="Background" type="ColorRect" parent="GameOver"]
 z_index = -1
+mouse_filter = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -144,16 +164,18 @@ theme_override_font_sizes/font_size = 32
 text = "▶  RESTART"
 
 [node name="CharSelect" type="PanelContainer" parent="."]
+mouse_filter = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="Background" type="ColorRect" parent="CharSelect"]
 z_index = -1
+mouse_filter = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.1, 0.18, 0.28, 0.92)
+color = Color(0.05, 0.1, 0.15, 0.5)
 
 [node name="VBox" type="VBoxContainer" parent="CharSelect"]
 anchors_preset = 15
