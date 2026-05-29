@@ -64,10 +64,31 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_player_moved(pos: Vector3i) -> void:
 	env_gen.update_player_z(pos.z)
+	var old_score := score_mgr.current_score
 	score_mgr.set_score(pos.z)
+	if score_mgr.current_score > old_score:
+		_spawn_score_popup(player.global_position)
 	audio.play_hop()
 	_check_row(pos)
 	_update_camera(false)
+
+func _spawn_score_popup(world_pos: Vector3) -> void:
+	var label := Label3D.new()
+	label.text = "+1"
+	label.font_size = 72
+	label.outline_size = 8
+	label.modulate = Color(1.0, 0.95, 0.2, 1.0)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	add_child(label)
+	label.global_position = world_pos + Vector3(0, 1.2, 0)
+	var t := create_tween()
+	t.set_parallel(true)
+	t.tween_property(label, "position:y", label.position.y + 1.8, 0.7)
+	t.tween_property(label, "modulate:a", 0.0, 0.7).set_delay(0.2)
+	await t.finished
+	if is_instance_valid(label):
+		label.queue_free()
 
 func _on_player_died(cause: String) -> void:
 	audio.play_death(cause)

@@ -65,8 +65,6 @@ func _try_hop(dir: Vector3i) -> void:
 func hop(dir: Vector3i) -> void:
 	is_hopping = true
 	var target := grid_pos + dir
-	# OBJ characters have their "front" on +Z, so use atan2 directly
-	# (look_at would flip them 180° since look_at points -Z at target).
 	visual.rotation.y = atan2(float(dir.x), float(dir.z))
 
 	var target_v := Vector3(target)
@@ -86,6 +84,8 @@ func hop(dir: Vector3i) -> void:
 	ty2.tween_property(self, "position:y", HOP_HEIGHT, HOP_TIME * 0.5)
 	ty2.tween_property(self, "position:y", 0.0, HOP_TIME * 0.5)
 
+	_spawn_hop_dust()
+
 	await t.finished
 	grid_pos = target
 	is_hopping = false
@@ -95,9 +95,9 @@ func die(cause: String) -> void:
 	if dead:
 		return
 	dead = true
-	# Death squash
 	var t := create_tween()
 	t.tween_property(visual, "scale", Vector3(1.5, 0.1, 1.5), 0.2)
+	_spawn_death_particles(cause)
 	died.emit(cause)
 
 func reset_to(pos: Vector3i) -> void:
@@ -106,3 +106,42 @@ func reset_to(pos: Vector3i) -> void:
 	grid_pos = pos
 	position = Vector3(pos)
 	visual.scale = Vector3.ONE
+
+# --- Effects ---
+
+func _make_particles(pos: Vector3, amt: int, life: float, spd_min: float, spd_max: float, sz: float, col: Color) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = amt
+	p.lifetime = life
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 180.0
+	p.gravity = Vector3(0, -9.0, 0)
+	p.initial_velocity_min = spd_min
+	p.initial_velocity_max = spd_max
+	p.scale_amount_min = sz * 0.7
+	p.scale_amount_max = sz
+	p.color = col
+	get_parent().add_child(p)
+	p.global_position = pos
+	p.emitting = true
+	return p
+
+func _spawn_hop_dust() -> void:
+	var p := _make_particles(
+		global_position + Vector3(0, 0.2, 0),
+		12, 0.6, 3.0, 6.0, 0.35,
+		Color(0.55, 0.85, 0.3, 1.0)
+	)
+	await get_tree().create_timer(1.5).timeout
+	if is_instance_valid(p): p.queue_free()
+
+func _spawn_death_particles(cause: String) -> void:
+	var col := Color(1.0, 0.4, 0.1, 1.0) if cause == "car" else Color(0.2, 0.7, 1.0, 1.0)
+	var p := _make_particles(
+		global_position + Vector3(0, 0.5, 0),
+		30, 1.5, 4.0, 9.0, 0.55, col
+	)
+	await get_tree().create_timer(3.0).timeout
+	if is_instance_valid(p): p.queue_free()
